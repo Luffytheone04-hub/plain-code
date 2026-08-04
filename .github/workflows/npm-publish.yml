@@ -28,8 +28,19 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Update package version
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+      - name: Update package version (if needed)
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          TARGET="${{ github.event.inputs.version }}"
+
+          echo "Current: $CURRENT"
+          echo "Target : $TARGET"
+
+          if [ "$CURRENT" != "$TARGET" ]; then
+            npm version "$TARGET" --no-git-tag-version
+          else
+            echo "Version already matches. Skipping update."
+          fi
 
       - name: Run tests
         run: npm test
@@ -39,14 +50,30 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Commit version bump
+      - name: Commit version bump (if changed)
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+
           git add package.json package-lock.json
-          git commit -m "Release v${{ github.event.inputs.version }}" || echo "Nothing to commit"
-          git tag v${{ github.event.inputs.version }}
-          git push origin main --tags
+
+          if git diff --cached --quiet; then
+            echo "No version changes to commit."
+          else
+            git commit -m "Release v${{ github.event.inputs.version }}"
+            git push origin main
+          fi
+
+      - name: Create tag (if missing)
+        run: |
+          TAG="v${{ github.event.inputs.version }}"
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag already exists."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
