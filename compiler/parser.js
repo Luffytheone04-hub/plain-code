@@ -1,27 +1,49 @@
-// Parser: converts a token stream into an AST
+// Parser: converts a token stream into an AST (Abstract Syntax Tree).
 
 const { TOKEN } = require('./lexer');
+
+// All statement-level Plain keywords, used for "did you mean?" suggestions.
+const STATEMENT_KEYWORDS = ['remember', 'show', 'if', 'make', 'give', 'otherwise', 'done'];
+
+// Returns the Levenshtein edit distance between two strings.
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Returns the closest keyword if within edit distance 2, otherwise null.
+function closestKeyword(word) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const kw of STATEMENT_KEYWORDS) {
+    const d = levenshtein(word.toLowerCase(), kw);
+    if (d < bestDist) { bestDist = d; best = kw; }
+  }
+  return bestDist <= 2 ? best : null;
+}
 
 function parse(tokens) {
   let pos = 0;
 
-  function peek() {
-    return tokens[pos];
-  }
+  function peek()           { return tokens[pos]; }
+  function peekAt(offset)   { return tokens[pos + offset] || { type: TOKEN.EOF }; }
+  function advance()        { return tokens[pos++]; }
 
-  function peekAt(offset) {
-    return tokens[pos + offset] || { type: TOKEN.EOF };
-  }
-
-  function consume(expectedType) {
+  function consume(expectedType, hint) {
     const token = tokens[pos];
-    if (expectedType && token.type !== expectedType) {
-      throw new Error(
-        `Expected ${expectedType} but got ${token.type} ("${token.value}")`
-      );
+    if (token.type !== expectedType) {
+      throw new Error(hint || `Expected ${expectedType} but got "${token.value || token.type}".`);
     }
-    pos++;
-    return token;
+    return advance();
   }
 
   // ── Statements ─────────────────────────────────────────────────────────────
@@ -29,27 +51,45 @@ function parse(tokens) {
   function parseStatement() {
     const token = peek();
 
-    if (token.type === TOKEN.REMEMBER)  return parseRemember();
-    if (token.type === TOKEN.SHOW)      return parseShow();
-    if (token.type === TOKEN.IF)        return parseIf();
-    if (token.type === TOKEN.MAKE)      return parseMake();
-    if (token.type === TOKEN.GIVE)      return parseGive();
+    if (token.type === TOKEN.REMEMBER) return parseRemember();
+    if (token.type === TOKEN.SHOW)     return parseShow();
+    if (token.type === TOKEN.IF)       return parseIf();
+    if (token.type === TOKEN.MAKE)     return parseMake();
+    if (token.type === TOKEN.GIVE)     return parseGive();
 
     // Bare function call as a statement: name(...)
     if (token.type === TOKEN.IDENTIFIER && peekAt(1).type === TOKEN.LPAREN) {
-      const expr = parseCallExpression();
-      return { type: 'ExpressionStatement', expression: expr };
+      return { type: 'ExpressionStatement', expression: parseCallExpression() };
     }
 
     if (token.type === TOKEN.EOF) return null;
 
-    throw new Error(`Unexpected token: ${token.type} ("${token.value}")`);
+    // Unknown or misspelled keyword — give a helpful message
+    if (token.type === TOKEN.IDENTIFIER) {
+      const suggestion = closestKeyword(token.value);
+      if (suggestion) {
+        throw new Error(
+          `Unknown keyword "${token.value}". Did you mean "${suggestion}"?`
+        );
+      }
+      throw new Error(
+        `Unexpected word "${token.value}". This is not a valid statement in Plain.`
+      );
+    }
+
+    throw new Error(`Unexpected keyword "${token.value}".`);
   }
 
   function parseRemember() {
     consume(TOKEN.REMEMBER);
-    const name = consume(TOKEN.IDENTIFIER).value;
-    consume(TOKEN.AS);
+    const name = consume(
+      TOKEN.IDENTIFIER,
+      'Expected a variable name after "remember".\n\nExample:\n  remember age as 16'
+    ).value;
+    consume(
+      TOKEN.AS,
+      'Expected keyword "as" after the variable name.\n\nExample:\n  remember age as 16'
+    );
     const value = parseExpression();
     return { type: 'RememberStatement', name, value };
   }
@@ -63,32 +103,35 @@ function parse(tokens) {
   // make name(params) ... done
   function parseMake() {
     consume(TOKEN.MAKE);
-    const name = consume(TOKEN.IDENTIFIER).value;
-    consume(TOKEN.LPAREN);
+    const name = consume(
+      TOKEN.IDENTIFIER,
+      'Expected a function name after "make".\n\nExample:\n  make greet()\n      show "Hello"\n  done'
+    ).value;
+    consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const params = parseParamList();
-    consume(TOKEN.RPAREN);
+    consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
 
     const body = [];
     while (peek().type !== TOKEN.DONE) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected "done" to close function definition');
+        throw new Error(
+          `Expected keyword "done" to close the function "${name}" before end of file.`
+        );
       }
       const stmt = parseStatement();
       if (stmt) body.push(stmt);
     }
-    consume(TOKEN.DONE);
-
+    advance(); // consume DONE
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
-  // Comma-separated parameter names (identifiers only)
   function parseParamList() {
     const params = [];
     if (peek().type === TOKEN.RPAREN) return params;
-    params.push(consume(TOKEN.IDENTIFIER).value);
+    params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name.').value);
     while (peek().type === TOKEN.COMMA) {
-      consume(TOKEN.COMMA);
-      params.push(consume(TOKEN.IDENTIFIER).value);
+      advance(); // consume comma
+      params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name after ",".').value);
     }
     return params;
   }
@@ -101,17 +144,17 @@ function parse(tokens) {
 
   // ── Conditions ─────────────────────────────────────────────────────────────
 
-  // if <expr> <comparison> <expr> ... [otherwise ...] done
+  // if <expr> <comparison> <expr>  [body]  [otherwise [body]]  done
   function parseIf() {
     consume(TOKEN.IF);
-    const left = parseExpression();
+    const left     = parseExpression();
     const operator = parseComparison();
-    const right = parseExpression();
+    const right    = parseExpression();
 
     const consequent = [];
     while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.DONE) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected "otherwise" or "done" to close "if" block');
+        throw new Error('Expected keyword "done" before end of file to close the "if" block.');
       }
       const stmt = parseStatement();
       if (stmt) consequent.push(stmt);
@@ -119,32 +162,32 @@ function parse(tokens) {
 
     let alternate = null;
     if (peek().type === TOKEN.OTHERWISE) {
-      consume(TOKEN.OTHERWISE);
+      advance(); // consume OTHERWISE
       alternate = [];
       while (peek().type !== TOKEN.DONE) {
         if (peek().type === TOKEN.EOF) {
-          throw new Error('Expected "done" to close "otherwise" block');
+          throw new Error('Expected keyword "done" before end of file to close the "otherwise" block.');
         }
         const stmt = parseStatement();
         if (stmt) alternate.push(stmt);
       }
     }
 
-    consume(TOKEN.DONE);
+    advance(); // consume DONE
     return { type: 'IfStatement', left, operator, right, consequent, alternate };
   }
 
   // is | is greater than | is less than
   function parseComparison() {
-    consume(TOKEN.IS);
+    consume(TOKEN.IS, 'Expected a comparison after the value. Use "is", "is greater than", or "is less than".');
     if (peek().type === TOKEN.GREATER) {
-      consume(TOKEN.GREATER);
-      consume(TOKEN.THAN);
+      advance();
+      consume(TOKEN.THAN, 'Expected "than" after "greater". Use: is greater than');
       return '>';
     }
     if (peek().type === TOKEN.LESS) {
-      consume(TOKEN.LESS);
-      consume(TOKEN.THAN);
+      advance();
+      consume(TOKEN.THAN, 'Expected "than" after "less". Use: is less than');
       return '<';
     }
     return '===';
@@ -156,7 +199,7 @@ function parse(tokens) {
   function parseExpression() {
     let left = parsePrimary();
     while (peek().type === TOKEN.PLUS) {
-      consume(TOKEN.PLUS);
+      advance(); // consume +
       const right = parsePrimary();
       left = { type: 'BinaryExpression', operator: '+', left, right };
     }
@@ -168,42 +211,47 @@ function parse(tokens) {
     const token = peek();
 
     if (token.type === TOKEN.STRING) {
-      consume(TOKEN.STRING);
+      advance();
       return { type: 'StringLiteral', value: token.value };
     }
 
     if (token.type === TOKEN.NUMBER) {
-      consume(TOKEN.NUMBER);
+      advance();
       return { type: 'NumberLiteral', value: token.value };
     }
 
     if (token.type === TOKEN.IDENTIFIER) {
-      if (peekAt(1).type === TOKEN.LPAREN) {
-        return parseCallExpression();
-      }
-      consume(TOKEN.IDENTIFIER);
+      if (peekAt(1).type === TOKEN.LPAREN) return parseCallExpression();
+      advance();
       return { type: 'Identifier', name: token.value };
     }
 
-    throw new Error(`Expected a value but got ${token.type} ("${token.value}")`);
+    throw new Error(
+      `Expected a value (a word, number, or string) but got "${token.value || token.type}".`
+    );
   }
 
   // name(arg, arg, ...)
   function parseCallExpression() {
-    const name = consume(TOKEN.IDENTIFIER).value;
-    consume(TOKEN.LPAREN);
+    const name = advance().value; // consume IDENTIFIER
+    consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const args = parseArgList();
-    consume(TOKEN.RPAREN);
+    consume(TOKEN.RPAREN, 'Expected ")" to close the argument list.');
     return { type: 'CallExpression', name, args };
   }
 
-  // Comma-separated argument expressions
   function parseArgList() {
     const args = [];
     if (peek().type === TOKEN.RPAREN) return args;
+    if (peek().type === TOKEN.EOF) {
+      throw new Error('Expected ")" to close the argument list before end of file.');
+    }
     args.push(parseExpression());
     while (peek().type === TOKEN.COMMA) {
-      consume(TOKEN.COMMA);
+      advance();
+      if (peek().type === TOKEN.EOF) {
+        throw new Error('Expected ")" to close the argument list before end of file.');
+      }
       args.push(parseExpression());
     }
     return args;
@@ -216,7 +264,6 @@ function parse(tokens) {
     const stmt = parseStatement();
     if (stmt) body.push(stmt);
   }
-
   return { type: 'Program', body };
 }
 

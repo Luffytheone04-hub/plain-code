@@ -245,6 +245,120 @@ test('throws on missing done in function', () => {
   }
 });
 
+// ── Error messages (Phase 2) ──────────────────────────────────────────────────
+
+console.log('\nPhase 2 — Error messages');
+
+function throws(name, src, expectedFragment) {
+  test(name, () => {
+    try {
+      compile(src);
+      throw new Error('should have thrown');
+    } catch (e) {
+      if (!e.message.toLowerCase().includes(expectedFragment.toLowerCase())) {
+        throw new Error(
+          `Expected message to include "${expectedFragment}", got:\n        ${e.message}`
+        );
+      }
+    }
+  });
+}
+
+// Missing "done"
+throws(
+  'missing done in if block mentions "done"',
+  'remember x as 1\nif x is 1\n  show "oops"',
+  'done'
+);
+
+throws(
+  'missing done in otherwise block mentions "done"',
+  'remember x as 1\nif x is 1\n  show "a"\notherwise\n  show "b"',
+  'done'
+);
+
+throws(
+  'missing done in function mentions "done"',
+  'make greet()\n  show "Hello"',
+  'done'
+);
+
+// Unexpected "otherwise"
+throws(
+  'unexpected "otherwise" at top level gives helpful message',
+  'otherwise',
+  'otherwise'
+);
+
+// Unknown / misspelled keyword with "did you mean"
+throws(
+  'misspelled "remembr" suggests "remember"',
+  'remembr name as "Ayokunle"',
+  'did you mean'
+);
+
+throws(
+  'misspelled "shwo" suggests "show"',
+  'shwo "Hello"',
+  'did you mean'
+);
+
+// Missing identifier after "remember"
+throws(
+  'missing variable name after "remember"',
+  'remember as 16',
+  'variable name'
+);
+
+// Missing value after "as"
+throws(
+  'missing value after "as"',
+  'remember age as',
+  'value'
+);
+
+// Unterminated string
+throws(
+  'unterminated string',
+  'show "hello',
+  'unterminated'
+);
+
+// Invalid comparison
+throws(
+  'invalid comparison keyword gives helpful message',
+  'remember x as 1\nif x bigger 1\n  show "a"\ndone',
+  'comparison'
+);
+
+// Unexpected end of file (bare expression)
+throws(
+  'unexpected end of file in expression',
+  'remember x as',
+  'value'
+);
+
+// Invalid function declaration — missing name
+throws(
+  'missing function name after "make"',
+  'make ()\n  show "hi"\ndone',
+  'function name'
+);
+
+// Invalid function call — missing closing paren
+throws(
+  'missing closing paren in function call',
+  'make greet()\n  show "hi"\ndone\ngreet(',
+  '")"'
+);
+
+// Invalid return (give) — missing value
+throws(
+  'give with no value',
+  'make f()\n  give\ndone',
+  'value'
+);
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
