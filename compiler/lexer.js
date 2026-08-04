@@ -4,9 +4,30 @@ const TOKEN = {
   REMEMBER: 'REMEMBER',
   SHOW: 'SHOW',
   AS: 'AS',
+  IF: 'IF',
+  OTHERWISE: 'OTHERWISE',
+  DONE: 'DONE',
+  IS: 'IS',
+  GREATER: 'GREATER',
+  LESS: 'LESS',
+  THAN: 'THAN',
   IDENTIFIER: 'IDENTIFIER',
   STRING: 'STRING',
+  NUMBER: 'NUMBER',
   EOF: 'EOF',
+};
+
+const KEYWORDS = {
+  remember: TOKEN.REMEMBER,
+  show:     TOKEN.SHOW,
+  as:       TOKEN.AS,
+  if:       TOKEN.IF,
+  otherwise: TOKEN.OTHERWISE,
+  done:     TOKEN.DONE,
+  is:       TOKEN.IS,
+  greater:  TOKEN.GREATER,
+  less:     TOKEN.LESS,
+  than:     TOKEN.THAN,
 };
 
 function tokenize(source) {
@@ -41,22 +62,24 @@ function tokenize(source) {
       continue;
     }
 
+    // Number literal
+    if (/[0-9]/.test(source[i])) {
+      let num = '';
+      while (i < source.length && /[0-9.]/.test(source[i])) {
+        num += source[i++];
+      }
+      tokens.push({ type: TOKEN.NUMBER, value: Number(num) });
+      continue;
+    }
+
     // Word (keyword or identifier)
     if (/[a-zA-Z_]/.test(source[i])) {
       let word = '';
       while (i < source.length && /[a-zA-Z0-9_]/.test(source[i])) {
         word += source[i++];
       }
-
-      if (word === 'remember') {
-        tokens.push({ type: TOKEN.REMEMBER, value: 'remember' });
-      } else if (word === 'show') {
-        tokens.push({ type: TOKEN.SHOW, value: 'show' });
-      } else if (word === 'as') {
-        tokens.push({ type: TOKEN.AS, value: 'as' });
-      } else {
-        tokens.push({ type: TOKEN.IDENTIFIER, value: word });
-      }
+      const type = KEYWORDS[word] || TOKEN.IDENTIFIER;
+      tokens.push({ type, value: word });
       continue;
     }
 
