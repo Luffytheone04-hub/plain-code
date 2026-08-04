@@ -163,6 +163,88 @@ test('throws on missing done', () => {
   }
 });
 
+// ── Day 3: make / give / function calls ──────────────────────────────────────
+
+console.log('\nDay 3 — make / give / function calls');
+
+test('tokenizes make and give keywords', () => {
+  const tokens = tokenize('make give');
+  if (tokens[0].type !== TOKEN.MAKE) throw new Error('make wrong');
+  if (tokens[1].type !== TOKEN.GIVE) throw new Error('give wrong');
+});
+
+test('tokenizes parentheses and comma', () => {
+  const tokens = tokenize('( , )');
+  if (tokens[0].type !== TOKEN.LPAREN) throw new Error('( wrong');
+  if (tokens[1].type !== TOKEN.COMMA)  throw new Error(', wrong');
+  if (tokens[2].type !== TOKEN.RPAREN) throw new Error(') wrong');
+});
+
+test('tokenizes plus', () => {
+  const tokens = tokenize('+');
+  if (tokens[0].type !== TOKEN.PLUS) throw new Error('+ wrong');
+});
+
+test('no-param function compiles to JS function', () => {
+  const src = 'make greet()\n    show "Hello"\ndone';
+  const js = compile(src);
+  if (!js.includes('function greet()')) throw new Error('missing function declaration');
+  if (!js.includes('console.log("Hello")')) throw new Error('missing body');
+});
+
+test('function with params compiles correctly', () => {
+  const src = 'make add(a, b)\n    give a + b\ndone';
+  const js = compile(src);
+  if (!js.includes('function add(a, b)')) throw new Error('missing params');
+  if (!js.includes('return a + b'))       throw new Error('missing return');
+});
+
+test('give compiles to return', () => {
+  const src = 'make double(x)\n    give x + x\ndone';
+  const js = compile(src);
+  if (!js.includes('return x + x')) throw new Error('missing return');
+});
+
+test('bare function call compiles to call statement', () => {
+  const src = 'make greet()\n    show "Hello"\ndone\ngreet()';
+  const js = compile(src);
+  if (!js.includes('greet();')) throw new Error('missing call statement');
+});
+
+test('function call as argument to show', () => {
+  const src = 'make add(a, b)\n    give a + b\ndone\nshow add(5, 7)';
+  const js = compile(src);
+  if (!js.includes('console.log(add(5, 7))')) throw new Error('missing show call');
+});
+
+test('day3 example: greet and add end-to-end', () => {
+  const src = [
+    'make greet()',
+    '    show "Hello"',
+    'done',
+    'greet()',
+    'make add(a, b)',
+    '    give a + b',
+    'done',
+    'show add(5, 7)',
+  ].join('\n');
+  const js = compile(src);
+  if (!js.includes('function greet()'))   throw new Error('missing greet');
+  if (!js.includes('greet();'))           throw new Error('missing greet call');
+  if (!js.includes('function add(a, b)')) throw new Error('missing add');
+  if (!js.includes('return a + b'))       throw new Error('missing return');
+  if (!js.includes('console.log(add(5, 7))')) throw new Error('missing show add');
+});
+
+test('throws on missing done in function', () => {
+  try {
+    compile('make greet()\n    show "Hello"');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('done')) throw e;
+  }
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

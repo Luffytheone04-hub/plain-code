@@ -9,16 +9,32 @@ function generate(ast) {
 
 function generateStatement(node, indent = '') {
   if (node.type === 'RememberStatement') {
-    return `${indent}const ${node.name} = ${generateValue(node.value)};`;
+    return `${indent}const ${node.name} = ${generateExpr(node.value)};`;
   }
 
   if (node.type === 'ShowStatement') {
-    return `${indent}console.log(${generateValue(node.value)});`;
+    return `${indent}console.log(${generateExpr(node.value)});`;
+  }
+
+  if (node.type === 'GiveStatement') {
+    return `${indent}return ${generateExpr(node.value)};`;
+  }
+
+  if (node.type === 'ExpressionStatement') {
+    return `${indent}${generateExpr(node.expression)};`;
+  }
+
+  if (node.type === 'FunctionDeclaration') {
+    const params = node.params.join(', ');
+    const body = node.body
+      .map(s => generateStatement(s, indent + '  '))
+      .join('\n');
+    return `${indent}function ${node.name}(${params}) {\n${body}\n${indent}}`;
   }
 
   if (node.type === 'IfStatement') {
-    const left  = generateValue(node.left);
-    const right = generateValue(node.right);
+    const left  = generateExpr(node.left);
+    const right = generateExpr(node.right);
     const condition = `${left} ${node.operator} ${right}`;
     const consequentBody = node.consequent
       .map(s => generateStatement(s, indent + '  '))
@@ -36,7 +52,7 @@ function generateStatement(node, indent = '') {
   throw new Error(`Unknown statement type: ${node.type}`);
 }
 
-function generateValue(node) {
+function generateExpr(node) {
   if (node.type === 'StringLiteral') {
     return JSON.stringify(node.value);
   }
@@ -49,7 +65,19 @@ function generateValue(node) {
     return node.name;
   }
 
-  throw new Error(`Unknown value type: ${node.type}`);
+  if (node.type === 'BinaryExpression') {
+    return `${generateExpr(node.left)} ${node.operator} ${generateExpr(node.right)}`;
+  }
+
+  if (node.type === 'CallExpression') {
+    const args = node.args.map(generateExpr).join(', ');
+    return `${node.name}(${args})`;
+  }
+
+  throw new Error(`Unknown expression type: ${node.type}`);
 }
+
+// Keep the old name as an alias so nothing breaks
+const generateValue = generateExpr;
 
 module.exports = { generate };

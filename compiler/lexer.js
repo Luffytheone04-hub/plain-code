@@ -1,33 +1,41 @@
 // Lexer: converts Plain source text into a stream of tokens
 
 const TOKEN = {
-  REMEMBER: 'REMEMBER',
-  SHOW: 'SHOW',
-  AS: 'AS',
-  IF: 'IF',
+  REMEMBER:  'REMEMBER',
+  SHOW:      'SHOW',
+  AS:        'AS',
+  IF:        'IF',
   OTHERWISE: 'OTHERWISE',
-  DONE: 'DONE',
-  IS: 'IS',
-  GREATER: 'GREATER',
-  LESS: 'LESS',
-  THAN: 'THAN',
+  DONE:      'DONE',
+  IS:        'IS',
+  GREATER:   'GREATER',
+  LESS:      'LESS',
+  THAN:      'THAN',
+  MAKE:      'MAKE',
+  GIVE:      'GIVE',
+  LPAREN:    'LPAREN',
+  RPAREN:    'RPAREN',
+  COMMA:     'COMMA',
+  PLUS:      'PLUS',
   IDENTIFIER: 'IDENTIFIER',
-  STRING: 'STRING',
-  NUMBER: 'NUMBER',
-  EOF: 'EOF',
+  STRING:    'STRING',
+  NUMBER:    'NUMBER',
+  EOF:       'EOF',
 };
 
 const KEYWORDS = {
-  remember: TOKEN.REMEMBER,
-  show:     TOKEN.SHOW,
-  as:       TOKEN.AS,
-  if:       TOKEN.IF,
+  remember:  TOKEN.REMEMBER,
+  show:      TOKEN.SHOW,
+  as:        TOKEN.AS,
+  if:        TOKEN.IF,
   otherwise: TOKEN.OTHERWISE,
-  done:     TOKEN.DONE,
-  is:       TOKEN.IS,
-  greater:  TOKEN.GREATER,
-  less:     TOKEN.LESS,
-  than:     TOKEN.THAN,
+  done:      TOKEN.DONE,
+  is:        TOKEN.IS,
+  greater:   TOKEN.GREATER,
+  less:      TOKEN.LESS,
+  than:      TOKEN.THAN,
+  make:      TOKEN.MAKE,
+  give:      TOKEN.GIVE,
 };
 
 function tokenize(source) {
@@ -82,6 +90,12 @@ function tokenize(source) {
       tokens.push({ type, value: word });
       continue;
     }
+
+    // Single-character punctuation
+    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN, value: '(' }); i++; continue; }
+    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN, value: ')' }); i++; continue; }
+    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,  value: ',' }); i++; continue; }
+    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,   value: '+' }); i++; continue; }
 
     throw new Error(`Unexpected character: "${source[i]}" at position ${i}`);
   }

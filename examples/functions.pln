@@ -1,0 +1,11 @@
+make greet()
+    show "Hello"
+done
+
+greet()
+
+make add(a, b)
+    give a + b
+done
+
+show add(5, 7)
