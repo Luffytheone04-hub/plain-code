@@ -1,10 +1,20 @@
 {
-  "name": "plain-code",
+  "name": "@ayoxx/plain-code",
   "version": "0.2.0",
   "description": "Plain — an Intent-Oriented Programming Language. When even a simple sentence can be code.",
   "main": "compiler/cli.js",
   "bin": {
-    "plain": "./compiler/cli.js"
+    "plain-code": "./compiler/cli.js"
+  },
+  "files": [
+    "compiler",
+    "docs",
+    "examples",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "node tests/compiler.test.js"
