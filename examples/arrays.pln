@@ -1,0 +1,13 @@
+remember players as [
+    "Haaland",
+    "Foden",
+    "Rodri"
+]
+
+show players[0]
+
+players[1] becomes "Palmer"
+
+show players[1]
+
+show length(players)

@@ -2,8 +2,8 @@
 
 const { TOKEN } = require('./lexer');
 
-// All statement-level Plain keywords, used for "did you mean?" suggestions.
-const STATEMENT_KEYWORDS = ['remember', 'show', 'if', 'make', 'give', 'otherwise', 'done'];
+// Statement-starting Plain keywords, used for "did you mean?" suggestions.
+const STATEMENT_KEYWORDS = ['remember', 'show', 'if', 'make', 'give', 'for', 'while', 'use'];
 
 // Returns the Levenshtein edit distance between two strings.
 function levenshtein(a, b) {
@@ -20,10 +20,9 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// Returns the closest keyword if within edit distance 2, otherwise null.
+// Returns the closest keyword within edit distance 2, or null.
 function closestKeyword(word) {
-  let best = null;
-  let bestDist = Infinity;
+  let best = null, bestDist = Infinity;
   for (const kw of STATEMENT_KEYWORDS) {
     const d = levenshtein(word.toLowerCase(), kw);
     if (d < bestDist) { bestDist = d; best = kw; }
@@ -34,9 +33,9 @@ function closestKeyword(word) {
 function parse(tokens) {
   let pos = 0;
 
-  function peek()           { return tokens[pos]; }
-  function peekAt(offset)   { return tokens[pos + offset] || { type: TOKEN.EOF }; }
-  function advance()        { return tokens[pos++]; }
+  function peek()         { return tokens[pos]; }
+  function peekAt(offset) { return tokens[pos + offset] || { type: TOKEN.EOF }; }
+  function advance()      { return tokens[pos++]; }
 
   function consume(expectedType, hint) {
     const token = tokens[pos];
@@ -56,30 +55,40 @@ function parse(tokens) {
     if (token.type === TOKEN.IF)       return parseIf();
     if (token.type === TOKEN.MAKE)     return parseMake();
     if (token.type === TOKEN.GIVE)     return parseGive();
-
-    // Bare function call as a statement: name(...)
-    if (token.type === TOKEN.IDENTIFIER && peekAt(1).type === TOKEN.LPAREN) {
-      return { type: 'ExpressionStatement', expression: parseCallExpression() };
-    }
+    if (token.type === TOKEN.FOR)      return parseForEach();
+    if (token.type === TOKEN.WHILE)    return parseWhile();
+    if (token.type === TOKEN.USE)      return parseUse();
 
     if (token.type === TOKEN.EOF) return null;
 
-    // Unknown or misspelled keyword — give a helpful message
+    // Statements starting with an identifier: call, becomes, index/member becomes
     if (token.type === TOKEN.IDENTIFIER) {
-      const suggestion = closestKeyword(token.value);
-      if (suggestion) {
-        throw new Error(
-          `Unknown keyword "${token.value}". Did you mean "${suggestion}"?`
-        );
+      const expr = parsePrimary(); // handles calls, index chains, member chains
+
+      if (peek().type === TOKEN.BECOMES) {
+        advance(); // consume becomes
+        const value = parseExpression();
+        return { type: 'BecomeStatement', target: expr, value };
       }
-      throw new Error(
-        `Unexpected word "${token.value}". This is not a valid statement in Plain.`
-      );
+
+      if (expr.type === 'CallExpression') {
+        return { type: 'ExpressionStatement', expression: expr };
+      }
+
+      // Unknown or misspelled keyword
+      const word = expr.type === 'Identifier' ? expr.name : token.value;
+      const suggestion = closestKeyword(word);
+      if (suggestion) {
+        throw new Error(`Unknown keyword "${word}". Did you mean "${suggestion}"?`);
+      }
+      throw new Error(`Unexpected word "${word}". This is not a valid statement in Plain.`);
     }
 
     throw new Error(`Unexpected keyword "${token.value}".`);
   }
 
+  // remember <name> as <value>
+  // remember <name> as\n  <key> is <val>\n  ...\ndone   (object literal)
   function parseRemember() {
     consume(TOKEN.REMEMBER);
     const name = consume(
@@ -90,6 +99,13 @@ function parse(tokens) {
       TOKEN.AS,
       'Expected keyword "as" after the variable name.\n\nExample:\n  remember age as 16'
     );
+
+    // Detect object literal: next token is IDENTIFIER followed by IS
+    if (peek().type === TOKEN.IDENTIFIER && peekAt(1).type === TOKEN.IS) {
+      const value = parseObjectLiteral();
+      return { type: 'RememberStatement', name, value };
+    }
+
     const value = parseExpression();
     return { type: 'RememberStatement', name, value };
   }
@@ -105,23 +121,13 @@ function parse(tokens) {
     consume(TOKEN.MAKE);
     const name = consume(
       TOKEN.IDENTIFIER,
-      'Expected a function name after "make".\n\nExample:\n  make greet()\n      show "Hello"\n  done'
+      'Expected a function name after "make".\n\nExample:\n  make greet()\n    show "Hello"\n  done'
     ).value;
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const params = parseParamList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
 
-    const body = [];
-    while (peek().type !== TOKEN.DONE) {
-      if (peek().type === TOKEN.EOF) {
-        throw new Error(
-          `Expected keyword "done" to close the function "${name}" before end of file.`
-        );
-      }
-      const stmt = parseStatement();
-      if (stmt) body.push(stmt);
-    }
-    advance(); // consume DONE
+    const body = parseBody(`function "${name}"`);
     return { type: 'FunctionDeclaration', name, params, body };
   }
 
@@ -130,7 +136,7 @@ function parse(tokens) {
     if (peek().type === TOKEN.RPAREN) return params;
     params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name.').value);
     while (peek().type === TOKEN.COMMA) {
-      advance(); // consume comma
+      advance();
       params.push(consume(TOKEN.IDENTIFIER, 'Expected a parameter name after ",".').value);
     }
     return params;
@@ -140,6 +146,34 @@ function parse(tokens) {
     consume(TOKEN.GIVE);
     const value = parseExpression();
     return { type: 'GiveStatement', value };
+  }
+
+  // for each <item> in <collection> ... done
+  function parseForEach() {
+    consume(TOKEN.FOR);
+    consume(TOKEN.EACH, 'Expected "each" after "for".\n\nExample:\n  for each item in players\n    show item\n  done');
+    const item = consume(TOKEN.IDENTIFIER, 'Expected an item name after "each".').value;
+    consume(TOKEN.IN, `Expected "in" after "${item}".\n\nExample:\n  for each item in players`);
+    const collection = parseExpression();
+    const body = parseBody('"for each" loop');
+    return { type: 'ForEachStatement', item, collection, body };
+  }
+
+  // while <left> <comparison> <right> ... done
+  function parseWhile() {
+    consume(TOKEN.WHILE);
+    const left     = parseExpression();
+    const operator = parseComparison();
+    const right    = parseExpression();
+    const body     = parseBody('"while" loop');
+    return { type: 'WhileStatement', left, operator, right, body };
+  }
+
+  // use <module>
+  function parseUse() {
+    consume(TOKEN.USE);
+    const module = consume(TOKEN.IDENTIFIER, 'Expected a module name after "use".\n\nExample:\n  use math').value;
+    return { type: 'UseStatement', module };
   }
 
   // ── Conditions ─────────────────────────────────────────────────────────────
@@ -162,7 +196,7 @@ function parse(tokens) {
 
     let alternate = null;
     if (peek().type === TOKEN.OTHERWISE) {
-      advance(); // consume OTHERWISE
+      advance();
       alternate = [];
       while (peek().type !== TOKEN.DONE) {
         if (peek().type === TOKEN.EOF) {
@@ -193,32 +227,65 @@ function parse(tokens) {
     return '===';
   }
 
+  // ── Shared helpers ──────────────────────────────────────────────────────────
+
+  // Parses statements until DONE; used by make, for each, while.
+  function parseBody(context) {
+    const body = [];
+    while (peek().type !== TOKEN.DONE) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(`Expected keyword "done" to close the ${context} before end of file.`);
+      }
+      const stmt = parseStatement();
+      if (stmt) body.push(stmt);
+    }
+    advance(); // consume DONE
+    return body;
+  }
+
   // ── Expressions ────────────────────────────────────────────────────────────
 
   // expression → primary ('+' primary)*
   function parseExpression() {
     let left = parsePrimary();
     while (peek().type === TOKEN.PLUS) {
-      advance(); // consume +
+      advance();
       const right = parsePrimary();
       left = { type: 'BinaryExpression', operator: '+', left, right };
     }
     return left;
   }
 
-  // primary → STRING | NUMBER | IDENTIFIER '(' args ')' | IDENTIFIER
+  // primary → atom (postfix)*
+  // postfix  → '[' expr ']'  |  '.' IDENTIFIER
   function parsePrimary() {
+    let node = parseAtom();
+
+    while (true) {
+      if (peek().type === TOKEN.LBRACKET) {
+        advance(); // consume [
+        const index = parseExpression();
+        consume(TOKEN.RBRACKET, 'Expected "]" to close the index.');
+        node = { type: 'IndexExpression', object: node, index };
+      } else if (peek().type === TOKEN.DOT) {
+        advance(); // consume .
+        const property = consume(TOKEN.IDENTIFIER, 'Expected a property name after ".".').value;
+        node = { type: 'MemberExpression', object: node, property };
+      } else {
+        break;
+      }
+    }
+
+    return node;
+  }
+
+  // atom → STRING | NUMBER | '[' ... ']' | IDENTIFIER '(' args ')' | IDENTIFIER
+  function parseAtom() {
     const token = peek();
 
-    if (token.type === TOKEN.STRING) {
-      advance();
-      return { type: 'StringLiteral', value: token.value };
-    }
-
-    if (token.type === TOKEN.NUMBER) {
-      advance();
-      return { type: 'NumberLiteral', value: token.value };
-    }
+    if (token.type === TOKEN.STRING)   { advance(); return { type: 'StringLiteral',  value: token.value }; }
+    if (token.type === TOKEN.NUMBER)   { advance(); return { type: 'NumberLiteral',  value: token.value }; }
+    if (token.type === TOKEN.LBRACKET) { return parseArrayLiteral(); }
 
     if (token.type === TOKEN.IDENTIFIER) {
       if (peekAt(1).type === TOKEN.LPAREN) return parseCallExpression();
@@ -227,8 +294,40 @@ function parse(tokens) {
     }
 
     throw new Error(
-      `Expected a value (a word, number, or string) but got "${token.value || token.type}".`
+      `Expected a value (a word, number, string, or array) but got "${token.value || token.type}".`
     );
+  }
+
+  // [ expr, expr, ... ]
+  function parseArrayLiteral() {
+    consume(TOKEN.LBRACKET);
+    const elements = [];
+    while (peek().type !== TOKEN.RBRACKET) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error('Expected "]" to close the array before end of file.');
+      }
+      elements.push(parseExpression());
+      if (peek().type === TOKEN.COMMA) advance();
+    }
+    consume(TOKEN.RBRACKET, 'Expected "]" to close the array.');
+    return { type: 'ArrayLiteral', elements };
+  }
+
+  // Object literal body: key is value  ...  done
+  // Called after `remember name as` when IDENTIFIER IS is detected.
+  function parseObjectLiteral() {
+    const properties = [];
+    while (peek().type !== TOKEN.DONE) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error('Expected keyword "done" to close the object literal before end of file.');
+      }
+      const key = consume(TOKEN.IDENTIFIER, 'Expected a property name.').value;
+      consume(TOKEN.IS, `Expected "is" after property name "${key}".\n\nExample:\n  name is "Ayokunle"`);
+      const value = parseExpression();
+      properties.push({ key, value });
+    }
+    advance(); // consume DONE
+    return { type: 'ObjectLiteral', properties };
   }
 
   // name(arg, arg, ...)

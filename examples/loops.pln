@@ -1,0 +1,17 @@
+remember players as [
+    "Haaland",
+    "Foden",
+    "Rodri"
+]
+
+for each player in players
+    show player
+done
+
+remember count as 0
+
+while count is less than 3
+    count becomes count + 1
+done
+
+show count

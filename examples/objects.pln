@@ -1,0 +1,12 @@
+remember user as
+    name is "Ayokunle"
+    age is 17
+    country is "Nigeria"
+done
+
+show user.name
+show user.age
+
+user.age becomes 18
+
+show user.age

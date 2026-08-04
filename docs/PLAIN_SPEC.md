@@ -1,6 +1,6 @@
-# Plain Language Specification (v0.1)
+# Plain Language Specification (v0.2)
 
-Version: 0.1
+Version: 0.2
 Status: Draft
 File Extension: .pln
 
@@ -29,15 +29,10 @@ Every keyword should be understandable by a 12-year-old.
 ## Core Principles
 
 1. One way to do everything.
-
 2. Readability over fewer characters.
-
 3. Keywords never have aliases.
-
 4. Error messages should teach.
-
 5. JavaScript is an implementation detail.
-
 6. Code should read like documentation.
 
 ----------------------------------------
@@ -46,166 +41,170 @@ Every keyword should be understandable by a 12-year-old.
 
 Single line
 
-// This is a comment
-
-Documentation
-
-note:
-
-This function creates a server.
+    // This is a comment
 
 ----------------------------------------
 
 ## Variables
 
-Syntax
+Declare:
 
-remember name as "Ayokunle"
+    remember name as "Ayokunle"
+    remember age as 16
 
-remember age as 16
+Reassign:
 
-remember isAdmin as true
-
-Multiple variables
-
-remember name, age as (
-    "Ayokunle",
-    16
-)
-
-Variables are immutable.
-
-Reassignment
-
-age becomes 17
+    age becomes 17
 
 ----------------------------------------
 
 ## Printing
 
-show "Hello"
-
-show age
-
-show `${name}`
+    show "Hello"
+    show age
+    show players[0]
+    show user.name
 
 ----------------------------------------
 
 ## Conditions
 
-if age is 18
+    if age is 18
+        show "Adult"
+    otherwise
+        show "Minor"
+    done
 
-    show "Adult"
+Comparison keywords:
 
-otherwise
-
-    show "Minor"
-
-done
-
-Comparison keywords
-
-is
-
-is greater than
-
-is less than
-
-is greater than or equal to
-
-is less than or equal to
+    is
+    is greater than
+    is less than
 
 ----------------------------------------
 
 ## Functions
 
-make greet()
+    make greet()
+        show "Hello"
+    done
 
-    show "Hello"
+    greet()
 
-done
+Returning values:
 
-Returning values
+    make add(a, b)
+        give a + b
+    done
 
-make add(a, b)
-
-    give a + b
-
-done
+    show add(5, 7)
 
 ----------------------------------------
 
 ## Arrays
 
-remember fruits as [
-    "Apple",
-    "Banana"
-]
+Declare:
+
+    remember players as [
+        "Haaland",
+        "Foden",
+        "Rodri"
+    ]
+
+Index:
+
+    show players[0]
+
+Assign by index:
+
+    players[1] becomes "Palmer"
 
 ----------------------------------------
 
 ## Objects
 
-remember person as
+Declare:
 
-    name is "Kunle"
+    remember user as
+        name is "Ayokunle"
+        age is 17
+        country is "Nigeria"
+    done
 
-    age is 16
+Property access:
 
-    country is "Nigeria"
+    show user.name
 
-done
+Property assignment:
+
+    user.age becomes 18
+
+----------------------------------------
+
+## Loops
+
+For each:
+
+    for each player in players
+        show player
+    done
+
+Generates: for (const player of players) { ... }
+
+While:
+
+    while age is less than 18
+        age becomes age + 1
+    done
+
+Generates: while (age < 18) { ... }
+
+----------------------------------------
+
+## Standard Library
+
+Built-in functions that compile to JavaScript equivalents:
+
+| Plain              | JavaScript equivalent          |
+|--------------------|-------------------------------|
+| length(x)          | (x).length                    |
+| uppercase(text)    | (text).toUpperCase()          |
+| lowercase(text)    | (text).toLowerCase()          |
+| random()           | Math.random()                 |
+| round(number)      | Math.round(number)            |
+
+Example:
+
+    show length(players)
+    show uppercase("hello")
+    show round(3.7)
 
 ----------------------------------------
 
 ## Imports
 
-use express
+Syntax (parser support only; runtime not yet available):
 
-use sqlite
+    use math
+    use sqlite
 
-----------------------------------------
-
-## Philosophy
-
-Frameworks should become English.
-
-The programmer should express intent.
-
-The compiler should handle implementation.
+Compiles to a placeholder comment.
 
 ----------------------------------------
 
 ## Reserved Keywords
 
-remember
-
-becomes
-
-show
-
-make
-
-give
-
-use
-
-if
-
-otherwise
-
-done
-
-is
-
-true
-
-false
-
-note
+    remember  becomes  show
+    make      give
+    if        otherwise  done
+    for       each       in
+    while
+    use
+    is        greater    less    than
+    true      false
+    note
 
 ----------------------------------------
 
 This document is the single source of truth for Plain.
-
 Every compiler implementation must follow this specification.

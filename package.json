@@ -1,0 +1,17 @@
+{
+  "name": "plain-lang",
+  "version": "0.2.0",
+  "description": "Plain — an Intent-Oriented Programming Language. When even a simple sentence can be code.",
+  "main": "compiler/cli.js",
+  "bin": {
+    "plain": "./compiler/cli.js"
+  },
+  "scripts": {
+    "test": "node tests/compiler.test.js"
+  },
+  "keywords": ["plain", "language", "compiler", "iopl"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

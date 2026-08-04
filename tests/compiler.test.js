@@ -90,8 +90,8 @@ test('skips single-line comments', () => {
 
 console.log('\nDay 1 — remember + show');
 
-test('remember string compiles to const', () => {
-  assert(compile('remember name as "Ayokunle"'), 'const name = "Ayokunle";');
+test('remember string compiles to let', () => {
+  assert(compile('remember name as "Ayokunle"'), 'let name = "Ayokunle";');
 });
 
 test('show identifier compiles to console.log', () => {
@@ -105,7 +105,7 @@ test('show string literal', () => {
 test('remember then show (day1 example)', () => {
   assert(
     compile('remember name as "Ayokunle"\nshow name'),
-    'const name = "Ayokunle";\nconsole.log(name);'
+    'let name = "Ayokunle";\nconsole.log(name);'
   );
 });
 
@@ -358,6 +358,205 @@ throws(
   'make f()\n  give\ndone',
   'value'
 );
+
+// ── v0.2 — Arrays ────────────────────────────────────────────────────────────
+
+console.log('\nv0.2 — Arrays');
+
+test('tokenizes [ and ]', () => {
+  const tokens = tokenize('[ ]');
+  if (tokens[0].type !== TOKEN.LBRACKET) throw new Error('[ wrong');
+  if (tokens[1].type !== TOKEN.RBRACKET) throw new Error('] wrong');
+});
+
+test('array literal compiles to JS array', () => {
+  const src = 'remember players as ["Haaland", "Foden", "Rodri"]';
+  const js = compile(src);
+  if (!js.includes('["Haaland", "Foden", "Rodri"]')) throw new Error('missing array literal');
+});
+
+test('array index compiles to bracket access', () => {
+  const src = 'remember players as ["Haaland", "Foden"]\nshow players[0]';
+  const js = compile(src);
+  if (!js.includes('players[0]')) throw new Error('missing index access');
+});
+
+test('array index assignment (becomes) compiles correctly', () => {
+  const src = 'remember players as ["Haaland", "Foden"]\nplayers[1] becomes "Palmer"';
+  const js = compile(src);
+  if (!js.includes('players[1] = "Palmer"')) throw new Error('missing index assignment');
+});
+
+test('length() compiles to .length', () => {
+  const src = 'remember a as [1, 2, 3]\nshow length(a)';
+  const js = compile(src);
+  if (!js.includes('(a).length')) throw new Error('missing .length');
+});
+
+test('throws on unclosed array bracket', () => {
+  try {
+    compile('remember a as [1, 2');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.includes(']')) throw e;
+  }
+});
+
+// ── v0.2 — Objects ───────────────────────────────────────────────────────────
+
+console.log('\nv0.2 — Objects');
+
+test('tokenizes dot', () => {
+  const tokens = tokenize('user.name');
+  if (tokens[1].type !== TOKEN.DOT) throw new Error('. wrong');
+});
+
+test('object literal compiles to JS object', () => {
+  const src = 'remember user as\n  name is "Ayokunle"\n  age is 17\ndone';
+  const js = compile(src);
+  if (!js.includes('"name": "Ayokunle"')) throw new Error('missing name property');
+  if (!js.includes('"age": 17'))          throw new Error('missing age property');
+});
+
+test('property access compiles to dot notation', () => {
+  const src = 'remember user as\n  name is "Ayokunle"\ndone\nshow user.name';
+  const js = compile(src);
+  if (!js.includes('user.name')) throw new Error('missing member access');
+});
+
+test('property assignment (becomes) compiles correctly', () => {
+  const src = 'remember user as\n  age is 17\ndone\nuser.age becomes 18';
+  const js = compile(src);
+  if (!js.includes('user.age = 18')) throw new Error('missing member assignment');
+});
+
+test('throws on unclosed object literal', () => {
+  try {
+    compile('remember user as\n  name is "Ayokunle"');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('done')) throw e;
+  }
+});
+
+// ── v0.2 — becomes (reassignment) ────────────────────────────────────────────
+
+console.log('\nv0.2 — becomes');
+
+test('simple becomes compiles to assignment', () => {
+  const src = 'remember age as 16\nage becomes 17';
+  const js = compile(src);
+  if (!js.includes('age = 17')) throw new Error('missing assignment');
+});
+
+test('remember compiles to let (supports reassignment)', () => {
+  const src = 'remember x as 1';
+  const js = compile(src);
+  if (!js.includes('let x = 1')) throw new Error('expected let');
+});
+
+// ── v0.2 — Loops ─────────────────────────────────────────────────────────────
+
+console.log('\nv0.2 — Loops');
+
+test('tokenizes for / each / in keywords', () => {
+  const tokens = tokenize('for each item in players');
+  if (tokens[0].type !== TOKEN.FOR)        throw new Error('for wrong');
+  if (tokens[1].type !== TOKEN.EACH)       throw new Error('each wrong');
+  if (tokens[2].type !== TOKEN.IDENTIFIER) throw new Error('item wrong');
+  if (tokens[3].type !== TOKEN.IN)         throw new Error('in wrong');
+});
+
+test('for each compiles to for-of loop', () => {
+  const src = 'remember players as ["a", "b"]\nfor each player in players\n  show player\ndone';
+  const js = compile(src);
+  if (!js.includes('for (const player of players)')) throw new Error('missing for-of');
+  if (!js.includes('console.log(player)'))           throw new Error('missing body');
+});
+
+test('throws on missing done in for each', () => {
+  try {
+    compile('remember a as [1]\nfor each x in a\n  show x');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('done')) throw e;
+  }
+});
+
+// ── v0.2 — While ─────────────────────────────────────────────────────────────
+
+console.log('\nv0.2 — While');
+
+test('tokenizes while keyword', () => {
+  const tokens = tokenize('while');
+  if (tokens[0].type !== TOKEN.WHILE) throw new Error('while wrong');
+});
+
+test('while loop compiles to JS while', () => {
+  const src = 'remember age as 0\nwhile age is less than 18\n  age becomes age + 1\ndone';
+  const js = compile(src);
+  if (!js.includes('while (age < 18)'))   throw new Error('missing while condition');
+  if (!js.includes('age = age + 1'))      throw new Error('missing body');
+});
+
+test('while with is compiles to === condition', () => {
+  const src = 'remember x as 0\nwhile x is 0\n  x becomes 1\ndone';
+  const js = compile(src);
+  if (!js.includes('while (x === 0)')) throw new Error('missing while ===');
+});
+
+test('throws on missing done in while', () => {
+  try {
+    compile('remember x as 0\nwhile x is less than 5\n  x becomes x + 1');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('done')) throw e;
+  }
+});
+
+// ── v0.2 — Standard library ───────────────────────────────────────────────────
+
+console.log('\nv0.2 — Standard library');
+
+test('uppercase() compiles to toUpperCase()', () => {
+  const js = compile('show uppercase("hello")');
+  if (!js.includes('.toUpperCase()')) throw new Error('missing toUpperCase');
+});
+
+test('lowercase() compiles to toLowerCase()', () => {
+  const js = compile('show lowercase("HELLO")');
+  if (!js.includes('.toLowerCase()')) throw new Error('missing toLowerCase');
+});
+
+test('random() compiles to Math.random()', () => {
+  const js = compile('show random()');
+  if (!js.includes('Math.random()')) throw new Error('missing Math.random');
+});
+
+test('round() compiles to Math.round()', () => {
+  const js = compile('show round(3)');
+  if (!js.includes('Math.round(3)')) throw new Error('missing Math.round');
+});
+
+// ── v0.2 — Imports ────────────────────────────────────────────────────────────
+
+console.log('\nv0.2 — Imports');
+
+test('tokenizes use keyword', () => {
+  const tokens = tokenize('use math');
+  if (tokens[0].type !== TOKEN.USE) throw new Error('use wrong');
+});
+
+test('use compiles to a placeholder comment', () => {
+  const js = compile('use math');
+  if (!js.includes('// use math')) throw new Error('missing comment');
+});
+
+test('multiple imports compile', () => {
+  const js = compile('use math\nuse sqlite');
+  if (!js.includes('// use math'))   throw new Error('missing math comment');
+  if (!js.includes('// use sqlite')) throw new Error('missing sqlite comment');
+});
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 
