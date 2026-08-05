@@ -1,6 +1,6 @@
-# Plain Language Specification (v0.3)
+# Plain Language Specification (v0.4.2)
 
-Version: 0.3
+Version: 0.4.2
 Status: Draft
 File Extension: .pln
 
@@ -261,6 +261,41 @@ Compiles to: `app.listen(3000, () => { ... })`
     remember db as sqlite("database.db")
 
 Compiles to: `new Database("database.db")`
+
+---
+
+## Project Management (v0.4.2)
+
+Plain manages project configuration through `plain.json`.
+
+### plain.json format
+
+    {
+        "name": "my-app",
+        "version": "0.1.0",
+        "entry": "app.pln",
+        "dependencies": {
+            "express": "^4.18.2"
+        }
+    }
+
+### Commands
+
+| Command                 | Behaviour                                          |
+|-------------------------|----------------------------------------------------|
+| `plain init`            | Creates `plain.json` in the current directory      |
+| `plain install`         | Runs `npm install` for all listed dependencies     |
+| `plain add <pkg>`       | Installs package, adds it to `plain.json`          |
+| `plain remove <pkg>`    | Uninstalls package, removes it from `plain.json`   |
+| `plain update`          | Runs `npm update` for all installed packages       |
+
+### Dependency validation
+
+Before compiling, Plain checks that every package referenced by `use` is installed.
+If a package is missing, the compiler prints a friendly error and stops:
+
+    Package "express" is not installed.
+    Run: plain add express
 
 ---
 

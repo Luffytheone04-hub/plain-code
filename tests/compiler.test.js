@@ -1,5 +1,6 @@
 // Tests for the Plain compiler
 
+const fs   = require('fs');
 const path = require('path');
 const { tokenize, TOKEN } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
@@ -826,6 +827,247 @@ test('missing imported file gives friendly error', () => {
 test('import path preserved correctly in AST', () => {
   const ast = parse(tokenize('import "./sub/module.pln"'));
   if (ast.body[0].path !== './sub/module.pln') throw new Error('wrong path');
+});
+
+// ── v0.4.2 — Package Manager & Project Management ────────────────────────────
+
+console.log('\nv0.4.2 — plain init');
+
+const os  = require('os');
+const { execFileSync: _execFileSync } = require('child_process');
+const CLI = path.join(__dirname, '..', 'compiler', 'cli.js');
+
+// Run the CLI in a temporary directory.
+// Returns combined stdout+stderr as a string; never throws.
+function runCli(args, cwd) {
+  try {
+    return _execFileSync(process.execPath, [CLI, ...args], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env },
+    });
+  } catch (e) {
+    return (e.stdout || '') + (e.stderr || '');
+  }
+}
+
+// Create a fresh temp directory for a test.
+function tmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'plain-test-'));
+}
+
+test('plain init creates plain.json', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const jsonPath = path.join(dir, 'plain.json');
+  if (!fs.existsSync(jsonPath)) throw new Error('plain.json was not created');
+  const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  if (!data.name)    throw new Error('plain.json missing "name"');
+  if (!data.version) throw new Error('plain.json missing "version"');
+  if (!data.entry)   throw new Error('plain.json missing "entry"');
+});
+
+test('plain init shows "Project already initialized." when plain.json exists', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const out = runCli(['init'], dir);
+  if (!out.includes('Project already initialized.')) {
+    throw new Error(`Expected "Project already initialized." but got: ${out}`);
+  }
+});
+
+test('plain init plain.json has correct default entry', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const data = JSON.parse(fs.readFileSync(path.join(dir, 'plain.json'), 'utf8'));
+  if (data.entry !== 'app.pln') throw new Error(`expected entry "app.pln", got "${data.entry}"`);
+});
+
+test('plain init plain.json is valid JSON with name, version, entry', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(path.join(dir, 'plain.json'), 'utf8'));
+  } catch (e) {
+    throw new Error(`plain.json is not valid JSON: ${e.message}`);
+  }
+  if (typeof data.name    !== 'string') throw new Error('name must be a string');
+  if (typeof data.version !== 'string') throw new Error('version must be a string');
+  if (typeof data.entry   !== 'string') throw new Error('entry must be a string');
+});
+
+console.log('\nv0.4.2 — plain add / remove');
+
+test('plain add errors without plain.json', () => {
+  const dir = tmpDir();
+  const out = runCli(['add', 'express'], dir);
+  if (!out.toLowerCase().includes('plain init')) {
+    throw new Error(`Expected hint to run "plain init" but got: ${out}`);
+  }
+});
+
+test('plain remove errors without plain.json', () => {
+  const dir = tmpDir();
+  const out = runCli(['remove', 'express'], dir);
+  if (!out.toLowerCase().includes('plain init')) {
+    throw new Error(`Expected hint to run "plain init" but got: ${out}`);
+  }
+});
+
+test('plain add without package name shows usage', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const out = runCli(['add'], dir);
+  if (!out.toLowerCase().includes('usage')) {
+    throw new Error(`Expected usage hint but got: ${out}`);
+  }
+});
+
+test('plain remove without package name shows usage', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const out = runCli(['remove'], dir);
+  if (!out.toLowerCase().includes('usage')) {
+    throw new Error(`Expected usage hint but got: ${out}`);
+  }
+});
+
+test('plain add rejects invalid package name (shell injection attempt)', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  // A name containing shell metacharacters must be rejected before npm is called.
+  const out = runCli(['add', 'express; rm -rf /'], dir);
+  if (!out.toLowerCase().includes('invalid package name')) {
+    throw new Error(`Expected "Invalid package name" error but got: ${out}`);
+  }
+});
+
+test('plain remove rejects invalid package name', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const out = runCli(['remove', '$(evil)'], dir);
+  if (!out.toLowerCase().includes('invalid package name')) {
+    throw new Error(`Expected "Invalid package name" error but got: ${out}`);
+  }
+});
+
+console.log('\nv0.4.2 — plain install');
+
+test('plain install errors without plain.json', () => {
+  const dir = tmpDir();
+  const out = runCli(['install'], dir);
+  if (!out.toLowerCase().includes('plain init')) {
+    throw new Error(`Expected hint to run "plain init" but got: ${out}`);
+  }
+});
+
+test('plain install with no dependencies says nothing to install', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const out = runCli(['install'], dir);
+  if (!out.includes('No dependencies to install.')) {
+    throw new Error(`Expected "No dependencies to install." but got: ${out}`);
+  }
+});
+
+test('plain install with listed dependencies invokes npm with those packages', () => {
+  // Write a plain.json with a dependency and run plain install.
+  // We verify: (a) the CLI does NOT say "No dependencies to install." —
+  // meaning it tried to install them, and (b) the output includes "Installing".
+  // We use "semver" (a package npm itself uses, likely already in cache).
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  // Manually add a dep to plain.json
+  const jsonPath = path.join(dir, 'plain.json');
+  const config = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+  config.dependencies = { semver: '*' };
+  fs.writeFileSync(jsonPath, JSON.stringify(config, null, 4) + '\n');
+  const out = runCli(['install'], dir);
+  // The CLI should have printed "Installing dependencies..." (not "No dependencies")
+  if (out.includes('No dependencies to install.')) {
+    throw new Error('plain install incorrectly skipped declared dependencies');
+  }
+  if (!out.toLowerCase().includes('installing')) {
+    throw new Error(`Expected "Installing" in output but got: ${out}`);
+  }
+});
+
+console.log('\nv0.4.2 — Dependency validation');
+
+test('dependency validation passes for built-in packages (fs, path)', () => {
+  // fs and path are Node built-ins — must never be flagged as missing.
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'use fs\nuse path\nshow "ok"\n');
+  const out = runCli(['build', plnFile], dir);
+  if (out.includes('is not installed')) {
+    throw new Error(`Built-in packages should not fail validation. Got: ${out}`);
+  }
+});
+
+test('dependency validation emits friendly error for uninstalled npm package', () => {
+  // Use express (a known Plain package) in a clean temp dir where it is NOT installed.
+  // plain build should stop with a friendly "is not installed" message.
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
+  const out = runCli(['build', plnFile], dir);
+  if (!out.includes('is not installed')) {
+    throw new Error(`Expected "is not installed" error for missing express. Got: ${out}`);
+  }
+});
+
+test('dependency validation error mentions the missing package name', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
+  const out = runCli(['build', plnFile], dir);
+  if (!out.includes('express')) {
+    throw new Error(`Expected package name "express" in error message. Got: ${out}`);
+  }
+});
+
+test('dependency validation error includes "plain add" hint', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
+  const out = runCli(['build', plnFile], dir);
+  if (!out.includes('plain add')) {
+    throw new Error(`Expected "plain add" hint in error message. Got: ${out}`);
+  }
+});
+
+console.log('\nv0.4.2 — CLI help');
+
+test('plain help includes "plain init"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain init')) throw new Error(`"plain init" missing from help. Got:\n${out}`);
+});
+
+test('plain help includes "plain install"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain install')) throw new Error(`"plain install" missing from help. Got:\n${out}`);
+});
+
+test('plain help includes "plain add"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain add')) throw new Error(`"plain add" missing from help. Got:\n${out}`);
+});
+
+test('plain help includes "plain remove"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain remove')) throw new Error(`"plain remove" missing from help. Got:\n${out}`);
+});
+
+test('plain help includes "plain update"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
+});
+
+test('plain version shows 0.4.2', () => {
+  const out = runCli(['version'], process.cwd());
+  if (!out.includes('0.4.2')) throw new Error(`Expected version 0.4.2 but got: ${out}`);
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

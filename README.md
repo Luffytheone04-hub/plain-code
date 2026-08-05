@@ -11,7 +11,8 @@ Plain is an Intent-Oriented Programming Language (IOPL). You describe **what** y
 ```bash
 npm install -g @ayoxx/plain-code
 plain new myapp
-cd myapp && npm install
+cd myapp
+plain install
 plain run app.pln
 ```
 
@@ -20,9 +21,14 @@ plain run app.pln
 ## CLI
 
 ```
-plain run   <file.pln>   Compile and execute a Plain program
-plain build <file.pln>   Compile to JavaScript without running
-plain new   [name]       Scaffold a new Plain project
+plain run    <file.pln>   Compile and execute a Plain program
+plain build  <file.pln>   Compile to JavaScript without running
+plain new    [name]       Create a new Plain project
+plain init               Create a plain.json in the current directory
+plain install            Install dependencies listed in plain.json
+plain add    <package>   Install a package and add it to plain.json
+plain remove <package>   Remove a package from plain.json and uninstall it
+plain update             Update all installed npm packages
 plain version            Print the compiler version
 plain help               Print help text
 ```
@@ -98,6 +104,75 @@ done
 | `lowercase(x)`  | Convert to lowercase     |
 | `random()`      | Random number 0–1        |
 | `round(x)`      | Round to nearest integer |
+
+---
+
+## Project management (v0.4.2)
+
+Plain can manage its own project configuration without relying on npm for everything.
+
+### plain init
+
+Create a `plain.json` in the current directory:
+
+```bash
+plain init
+```
+
+Generates:
+
+```json
+{
+    "name": "my-app",
+    "version": "0.1.0",
+    "entry": "app.pln"
+}
+```
+
+If `plain.json` already exists, Plain prints `Project already initialized.` and does nothing.
+
+### plain install
+
+Install all dependencies listed in `plain.json`:
+
+```bash
+plain install
+```
+
+### plain add
+
+Install a package and record it in `plain.json`:
+
+```bash
+plain add express
+plain add better-sqlite3
+```
+
+### plain remove
+
+Uninstall a package and remove it from `plain.json`:
+
+```bash
+plain remove express
+```
+
+### plain update
+
+Update all installed npm packages:
+
+```bash
+plain update
+```
+
+### Dependency validation
+
+Before compiling, Plain checks that every package referenced by `use` is installed.
+If a package is missing, you see a friendly error:
+
+```
+Package "express" is not installed.
+Run: plain add express
+```
 
 ---
 
