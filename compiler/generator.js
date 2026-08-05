@@ -27,7 +27,7 @@ function generate(ast) {
   if (ast.type !== 'Program') {
     throw new Error(`Expected a Program node but got "${ast.type}".`);
   }
-  return ast.body.map(node => generateStatement(node)).join('\n');
+  return ast.body.map(node => generateStatement(node)).filter(Boolean).join('\n');
 }
 
 function generateStatement(node, indent = '') {
@@ -46,6 +46,9 @@ function generateStatement(node, indent = '') {
 
     case 'ExpressionStatement':
       return `${indent}${generateExpr(node.expression)};`;
+
+    case 'ImportStatement':
+      return ''; // resolved at bundle time by the bundler
 
     case 'UseStatement': {
       const pkg = KNOWN_PACKAGES[node.module];

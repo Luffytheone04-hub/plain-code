@@ -5,7 +5,7 @@ const { TOKEN } = require('./lexer');
 // Statement-starting Plain keywords, used for "did you mean?" suggestions.
 const STATEMENT_KEYWORDS = [
   'remember', 'show', 'if', 'make', 'give',
-  'for', 'while', 'use', 'when', 'listen', 'reply', 'serve',
+  'for', 'while', 'use', 'import', 'when', 'listen', 'reply', 'serve',
 ];
 
 // Returns the Levenshtein edit distance between two strings.
@@ -61,6 +61,7 @@ function parse(tokens) {
     if (token.type === TOKEN.FOR)      return parseForEach();
     if (token.type === TOKEN.WHILE)    return parseWhile();
     if (token.type === TOKEN.USE)      return parseUse();
+    if (token.type === TOKEN.IMPORT)   return parseImport();
     if (token.type === TOKEN.WHEN)     return parseRoute();
     if (token.type === TOKEN.LISTEN)   return parseListen();
     if (token.type === TOKEN.REPLY)    return parseReply();
@@ -171,6 +172,16 @@ function parse(tokens) {
     const right    = parseExpression();
     const body     = parseBody('"while" loop');
     return { type: 'WhileStatement', left, operator, right, body };
+  }
+
+  // import "./file.pln"
+  function parseImport() {
+    consume(TOKEN.IMPORT);
+    const filePath = consume(
+      TOKEN.STRING,
+      'Expected a file path string after "import".\n\nExample:\n  import "./math.pln"'
+    ).value;
+    return { type: 'ImportStatement', path: filePath };
   }
 
   // use <module>

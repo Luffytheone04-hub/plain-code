@@ -20,6 +20,7 @@ const TOKEN = {
   IN:         'IN',
   WHILE:      'WHILE',
   USE:        'USE',
+  IMPORT:     'IMPORT',
   // v0.3 — runtime keywords
   WHEN:       'WHEN',
   SOMEONE:    'SOMEONE',
@@ -65,6 +66,7 @@ const KEYWORDS = {
   in:        TOKEN.IN,
   while:     TOKEN.WHILE,
   use:       TOKEN.USE,
+  import:    TOKEN.IMPORT,
   when:      TOKEN.WHEN,
   someone:   TOKEN.SOMEONE,
   visits:    TOKEN.VISITS,

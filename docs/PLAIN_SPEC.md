@@ -141,7 +141,41 @@ While:
 
 ---
 
-## Imports / Packages
+## Plain Imports (v0.4.1)
+
+Split a project across multiple `.pln` files:
+
+    import "./math.pln"
+    import "./utils.pln"
+
+Rules:
+
+- Paths must be relative (start with `./` or `../`).
+- Files are compiled in dependency order (deepest first).
+- Duplicate imports are silently de-duplicated.
+- Circular imports produce a friendly compiler error.
+- Missing files produce a friendly compiler error.
+
+Example project layout:
+
+    app.pln
+    math.pln
+    utils.pln
+
+`math.pln`:
+
+    remember PI as 3.14
+
+`app.pln`:
+
+    import "./math.pln"
+    show PI
+
+Output: one combined JavaScript file with `math.pln` code before `app.pln` code.
+
+---
+
+## Runtime Packages / Imports
 
 Supported packages:
 

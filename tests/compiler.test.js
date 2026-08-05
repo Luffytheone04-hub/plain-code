@@ -1,8 +1,29 @@
-// Tests for the Plain compiler (Day 1 + Day 2)
+// Tests for the Plain compiler
 
+const path = require('path');
 const { tokenize, TOKEN } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
 const { generate } = require('../compiler/generator');
+const { bundle, resolveDependencies } = require('../compiler/bundler');
+
+// Helper: bundle a fixture file and return the generated JS
+function bundleFixture(name) {
+  return bundle(path.join(__dirname, 'fixtures', name));
+}
+
+// Helper: expect a bundle to throw with a message matching substr
+function bundleThrows(label, fixtureName, substr) {
+  test(label, () => {
+    try {
+      bundleFixture(fixtureName);
+      throw new Error('expected an error but none was thrown');
+    } catch (e) {
+      if (!e.message.toLowerCase().includes(substr.toLowerCase())) {
+        throw new Error(`Expected error to include "${substr}" but got: ${e.message}`);
+      }
+    }
+  });
+}
 
 let passed = 0;
 let failed = 0;
@@ -689,6 +710,122 @@ test('sqlite() call compiles to new Database()', () => {
   const src = 'use sqlite\nremember db as sqlite("app.db")';
   const js = compile(src);
   if (!js.includes('new Database("app.db")')) throw new Error('missing new Database');
+});
+
+// ── Summary ──────────────────────────────────────────────────────────────────
+
+// ── v0.4.1 — Multi-file Package System ───────────────────────────────────────
+
+console.log('\nv0.4.1 — Multi-file imports');
+
+test('tokenizes import keyword', () => {
+  const tokens = tokenize('import "./math.pln"');
+  if (tokens[0].type !== TOKEN.IMPORT) throw new Error('import token wrong');
+  if (tokens[1].type !== TOKEN.STRING) throw new Error('path token wrong');
+  if (tokens[1].value !== './math.pln') throw new Error('path value wrong');
+});
+
+test('import parses to ImportStatement', () => {
+  const tokens = tokenize('import "./math.pln"');
+  const ast    = parse(tokens);
+  const node   = ast.body[0];
+  if (node.type !== 'ImportStatement')   throw new Error('wrong node type');
+  if (node.path !== './math.pln')        throw new Error('wrong path');
+});
+
+test('ImportStatement generates no output', () => {
+  const js = generate(parse(tokenize('import "./math.pln"')));
+  if (js.trim() !== '') throw new Error('import should generate empty string');
+});
+
+test('simple import — imported file compiles first', () => {
+  const js = bundleFixture('uses_math.pln');
+  // PI must be declared before it is used in show
+  const piIdx   = js.indexOf('let PI');
+  const showIdx = js.indexOf('console.log(PI)');
+  if (piIdx === -1)     throw new Error('PI not declared');
+  if (showIdx === -1)   throw new Error('show PI missing');
+  if (piIdx > showIdx)  throw new Error('PI declared after show — wrong order');
+});
+
+test('simple import — output contains imported code', () => {
+  const js = bundleFixture('uses_math.pln');
+  if (!js.includes('let PI = 3.14'))  throw new Error('PI missing');
+  if (!js.includes('let TAU = 6.28')) throw new Error('TAU missing');
+});
+
+test('two imports — both files included in output', () => {
+  const js = bundleFixture('uses_both.pln');
+  if (!js.includes('let PI'))        throw new Error('PI missing');
+  if (!js.includes('function double')) throw new Error('double missing');
+});
+
+test('nested imports — deepest dependency compiled first', () => {
+  const js = bundleFixture('nested_a.pln');
+  // nested_c defines deepValue, must appear before nested_b and nested_a output
+  const deepIdx = js.indexOf('let deepValue');
+  const aIdx    = js.indexOf('"a loaded"');
+  const bIdx    = js.indexOf('"b loaded"');
+  if (deepIdx === -1) throw new Error('deepValue missing');
+  if (bIdx === -1)    throw new Error('b loaded missing');
+  if (aIdx === -1)    throw new Error('a loaded missing');
+  if (deepIdx > bIdx) throw new Error('deepValue should come before b');
+  if (bIdx > aIdx)    throw new Error('b should come before a');
+});
+
+test('duplicate imports — code included exactly once', () => {
+  const js = bundleFixture('duplicate_a.pln');
+  // PI should appear only once in the output
+  const firstIdx  = js.indexOf('let PI');
+  const secondIdx = js.indexOf('let PI', firstIdx + 1);
+  if (firstIdx === -1)  throw new Error('PI not declared at all');
+  if (secondIdx !== -1) throw new Error('PI declared more than once — duplicate import not de-duped');
+});
+
+test('diamond imports — shared file included exactly once', () => {
+  const js = bundleFixture('diamond_top.pln');
+  const firstIdx  = js.indexOf('let sharedValue');
+  const secondIdx = js.indexOf('let sharedValue', firstIdx + 1);
+  if (firstIdx === -1)  throw new Error('sharedValue missing');
+  if (secondIdx !== -1) throw new Error('sharedValue declared twice — diamond not handled');
+  if (!js.includes('"left"'))  throw new Error('left missing');
+  if (!js.includes('"right"')) throw new Error('right missing');
+  if (!js.includes('"top"'))   throw new Error('top missing');
+});
+
+bundleThrows(
+  'circular imports give friendly error',
+  'circular_a.pln',
+  'circular'
+);
+
+bundleThrows(
+  'circular import error mentions the file name',
+  'circular_a.pln',
+  'circular_a'
+);
+
+test('missing imported file gives friendly error', () => {
+  const tokens = tokenize('import "./does_not_exist.pln"');
+  const ast = parse(tokens);
+  // Write a temp entry file referencing a non-existent file
+  const tmpPath = path.join(__dirname, 'fixtures', 'missing_import_entry.pln');
+  require('fs').writeFileSync(tmpPath, 'import "./no_such_file_xyz.pln"\n');
+  try {
+    bundle(tmpPath);
+    require('fs').unlinkSync(tmpPath);
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    require('fs').unlinkSync(tmpPath);
+    if (!e.message.toLowerCase().includes('cannot find')) {
+      throw new Error(`Expected "cannot find" in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('import path preserved correctly in AST', () => {
+  const ast = parse(tokenize('import "./sub/module.pln"'));
+  if (ast.body[0].path !== './sub/module.pln') throw new Error('wrong path');
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

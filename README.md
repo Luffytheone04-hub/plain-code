@@ -101,6 +101,26 @@ done
 
 ---
 
+## Multi-file projects (v0.4.1)
+
+Split your code across multiple `.pln` files using `import`:
+
+```plain
+import "./math.pln"
+import "./utils.pln"
+
+show PI
+show double(5)
+```
+
+Rules:
+- Paths must be relative (`./` or `../`)
+- Files compile in dependency order (deepest dependency first)
+- Duplicate imports are de-duplicated automatically
+- Circular imports produce a friendly compiler error
+
+---
+
 ## Express server (v0.3)
 
 ```plain

@@ -14,8 +14,9 @@ const { execSync } = require('child_process');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate } = require('./generator');
+const { bundle, resolveDependencies } = require('./bundler');
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.1';
 
 const HELP = `
 Plain v${VERSION} — Intent-Oriented Programming Language
@@ -29,6 +30,7 @@ Usage:
 
 Examples:
   plain run hello.pln
+  plain run app.pln        (resolves imports automatically)
   plain build hello.pln
   plain new myapp
 `.trim();
@@ -48,11 +50,14 @@ function stage(label, fn) {
 }
 
 function compile(filePath) {
-  const source = fs.readFileSync(path.resolve(filePath), 'utf8');
-  const tokens = stage('Lexing',                () => tokenize(source));
-  const ast    = stage('Parsing',               () => parse(tokens));
-                 stage('Building AST',          () => ast);
-  const js     = stage('Generating JavaScript', () => generate(ast));
+  let files;
+  stage('Resolving imports', () => {
+    files = resolveDependencies(path.resolve(filePath));
+  });
+  stage('Building dependency graph', () => files);
+  const js = stage('Generating JavaScript', () =>
+    files.map(({ ast }) => generate(ast)).filter(s => s.trim()).join('\n')
+  );
   return js;
 }
 
