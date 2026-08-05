@@ -543,19 +543,152 @@ test('round() compiles to Math.round()', () => {
 console.log('\nv0.2 — Imports');
 
 test('tokenizes use keyword', () => {
-  const tokens = tokenize('use math');
+  const tokens = tokenize('use express');
   if (tokens[0].type !== TOKEN.USE) throw new Error('use wrong');
 });
 
-test('use compiles to a placeholder comment', () => {
-  const js = compile('use math');
-  if (!js.includes('// use math')) throw new Error('missing comment');
+test('use express compiles to require', () => {
+  const js = compile('use express');
+  if (!js.includes("require('express')")) throw new Error('missing require express');
 });
 
-test('multiple imports compile', () => {
-  const js = compile('use math\nuse sqlite');
-  if (!js.includes('// use math'))   throw new Error('missing math comment');
-  if (!js.includes('// use sqlite')) throw new Error('missing sqlite comment');
+test('use fs compiles to require', () => {
+  const js = compile('use fs');
+  if (!js.includes("require('fs')")) throw new Error('missing require fs');
+});
+
+test('multiple known imports compile', () => {
+  const js = compile('use express\nuse fs');
+  if (!js.includes("require('express')")) throw new Error('missing express');
+  if (!js.includes("require('fs')"))      throw new Error('missing fs');
+});
+
+// ── v0.3 — Runtime package system ────────────────────────────────────────────
+
+console.log('\nv0.3 — Runtime packages');
+
+test('use sqlite compiles to require better-sqlite3', () => {
+  const js = compile('use sqlite');
+  if (!js.includes("require('better-sqlite3')")) throw new Error('missing sqlite require');
+});
+
+test('use path compiles to require path', () => {
+  const js = compile('use path');
+  if (!js.includes("require('path')")) throw new Error('missing path require');
+});
+
+throws(
+  'unknown package gives friendly error',
+  'use math',
+  'unknown package'
+);
+
+// ── v0.3 — Express runtime ───────────────────────────────────────────────────
+
+console.log('\nv0.3 — Express runtime');
+
+test('tokenizes when / someone / visits keywords', () => {
+  const tokens = tokenize('when someone visits "/"');
+  if (tokens[0].type !== TOKEN.WHEN)    throw new Error('when wrong');
+  if (tokens[1].type !== TOKEN.SOMEONE) throw new Error('someone wrong');
+  if (tokens[2].type !== TOKEN.VISITS)  throw new Error('visits wrong');
+});
+
+test('tokenizes listen / on keywords', () => {
+  const tokens = tokenize('listen on 3000');
+  if (tokens[0].type !== TOKEN.LISTEN) throw new Error('listen wrong');
+  if (tokens[1].type !== TOKEN.ON)     throw new Error('on wrong');
+});
+
+test('tokenizes reply keyword', () => {
+  const tokens = tokenize('reply');
+  if (tokens[0].type !== TOKEN.REPLY) throw new Error('reply wrong');
+});
+
+test('tokenizes json keyword', () => {
+  const tokens = tokenize('json');
+  if (tokens[0].type !== TOKEN.JSON_KW) throw new Error('json wrong');
+});
+
+test('tokenizes serve / folder keywords', () => {
+  const tokens = tokenize('serve folder "public"');
+  if (tokens[0].type !== TOKEN.SERVE)  throw new Error('serve wrong');
+  if (tokens[1].type !== TOKEN.FOLDER) throw new Error('folder wrong');
+});
+
+test('listen on port compiles to app.listen', () => {
+  const src = 'listen on 3000\n  show "Running"\ndone';
+  const js = compile(src);
+  if (!js.includes('app.listen(3000')) throw new Error('missing app.listen');
+  if (!js.includes('console.log("Running")')) throw new Error('missing body');
+});
+
+test('route compiles to app.get', () => {
+  const src = 'when someone visits "/"\n  reply "Hello"\ndone';
+  const js = compile(src);
+  if (!js.includes('app.get("/",'))   throw new Error('missing app.get');
+  if (!js.includes('(req, res) =>'))  throw new Error('missing callback');
+  if (!js.includes('res.send("Hello")')) throw new Error('missing reply');
+});
+
+test('reply compiles to res.send', () => {
+  const src = 'when someone visits "/"\n  reply "Hi"\ndone';
+  const js = compile(src);
+  if (!js.includes('res.send("Hi")')) throw new Error('missing res.send');
+});
+
+test('reply json compiles to res.json', () => {
+  const src = 'when someone visits "/api"\n  reply json\n    status is "ok"\n  done\ndone';
+  const js = compile(src);
+  if (!js.includes('res.json({'))                  throw new Error('missing res.json');
+  if (!js.includes('"status": "ok"'))              throw new Error('missing property');
+});
+
+test('serve folder compiles to app.use(express.static)', () => {
+  const src = 'serve folder "public"';
+  const js = compile(src);
+  if (!js.includes('app.use(express.static("public"))')) throw new Error('missing static');
+});
+
+test('request identifier remaps to req inside route', () => {
+  const src = 'when someone visits "/"\n  show request.method\ndone';
+  const js = compile(src);
+  if (!js.includes('req.method')) throw new Error('missing req.method');
+});
+
+test('response identifier remaps to res inside route', () => {
+  const src = 'when someone visits "/"\n  show response\ndone';
+  const js = compile(src);
+  if (!js.includes('console.log(res)')) throw new Error('missing res');
+});
+
+test('multiple routes compile independently', () => {
+  const src = [
+    'when someone visits "/"\n  reply "Home"\ndone',
+    'when someone visits "/about"\n  reply "About"\ndone',
+  ].join('\n');
+  const js = compile(src);
+  if (!js.includes('app.get("/",'))      throw new Error('missing / route');
+  if (!js.includes('app.get("/about",')) throw new Error('missing /about route');
+});
+
+test('throws on missing done in route', () => {
+  try {
+    compile('when someone visits "/"\n  reply "Hello"');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('done')) throw e;
+  }
+});
+
+// ── v0.3 — SQLite runtime ────────────────────────────────────────────────────
+
+console.log('\nv0.3 — SQLite runtime');
+
+test('sqlite() call compiles to new Database()', () => {
+  const src = 'use sqlite\nremember db as sqlite("app.db")';
+  const js = compile(src);
+  if (!js.includes('new Database("app.db")')) throw new Error('missing new Database');
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

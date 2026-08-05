@@ -1,0 +1,25 @@
+use express
+
+remember app as express()
+
+serve folder "public"
+
+when someone visits "/"
+    reply "Hello from Plain!"
+done
+
+when someone visits "/about"
+    reply "This server is written in Plain."
+done
+
+when someone visits "/api/status"
+    reply json
+        status is "ok"
+        language is "Plain"
+        version is "0.3"
+    done
+done
+
+listen on 3000
+    show "Server running at http://localhost:3000"
+done

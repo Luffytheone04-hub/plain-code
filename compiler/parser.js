@@ -3,7 +3,10 @@
 const { TOKEN } = require('./lexer');
 
 // Statement-starting Plain keywords, used for "did you mean?" suggestions.
-const STATEMENT_KEYWORDS = ['remember', 'show', 'if', 'make', 'give', 'for', 'while', 'use'];
+const STATEMENT_KEYWORDS = [
+  'remember', 'show', 'if', 'make', 'give',
+  'for', 'while', 'use', 'when', 'listen', 'reply', 'serve',
+];
 
 // Returns the Levenshtein edit distance between two strings.
 function levenshtein(a, b) {
@@ -58,15 +61,19 @@ function parse(tokens) {
     if (token.type === TOKEN.FOR)      return parseForEach();
     if (token.type === TOKEN.WHILE)    return parseWhile();
     if (token.type === TOKEN.USE)      return parseUse();
+    if (token.type === TOKEN.WHEN)     return parseRoute();
+    if (token.type === TOKEN.LISTEN)   return parseListen();
+    if (token.type === TOKEN.REPLY)    return parseReply();
+    if (token.type === TOKEN.SERVE)    return parseServeFolder();
 
     if (token.type === TOKEN.EOF) return null;
 
     // Statements starting with an identifier: call, becomes, index/member becomes
     if (token.type === TOKEN.IDENTIFIER) {
-      const expr = parsePrimary(); // handles calls, index chains, member chains
+      const expr = parsePrimary();
 
       if (peek().type === TOKEN.BECOMES) {
-        advance(); // consume becomes
+        advance();
         const value = parseExpression();
         return { type: 'BecomeStatement', target: expr, value };
       }
@@ -75,7 +82,6 @@ function parse(tokens) {
         return { type: 'ExpressionStatement', expression: expr };
       }
 
-      // Unknown or misspelled keyword
       const word = expr.type === 'Identifier' ? expr.name : token.value;
       const suggestion = closestKeyword(word);
       if (suggestion) {
@@ -88,7 +94,7 @@ function parse(tokens) {
   }
 
   // remember <name> as <value>
-  // remember <name> as\n  <key> is <val>\n  ...\ndone   (object literal)
+  // remember <name> as\n  <key> is <val>\n...\ndone   (object literal)
   function parseRemember() {
     consume(TOKEN.REMEMBER);
     const name = consume(
@@ -100,10 +106,9 @@ function parse(tokens) {
       'Expected keyword "as" after the variable name.\n\nExample:\n  remember age as 16'
     );
 
-    // Detect object literal: next token is IDENTIFIER followed by IS
+    // Object literal: next token is IDENTIFIER followed by IS
     if (peek().type === TOKEN.IDENTIFIER && peekAt(1).type === TOKEN.IS) {
-      const value = parseObjectLiteral();
-      return { type: 'RememberStatement', name, value };
+      return { type: 'RememberStatement', name, value: parseObjectLiteral() };
     }
 
     const value = parseExpression();
@@ -126,7 +131,6 @@ function parse(tokens) {
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const params = parseParamList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the parameter list.');
-
     const body = parseBody(`function "${name}"`);
     return { type: 'FunctionDeclaration', name, params, body };
   }
@@ -172,13 +176,62 @@ function parse(tokens) {
   // use <module>
   function parseUse() {
     consume(TOKEN.USE);
-    const module = consume(TOKEN.IDENTIFIER, 'Expected a module name after "use".\n\nExample:\n  use math').value;
+    const module = consume(TOKEN.IDENTIFIER, 'Expected a module name after "use".\n\nExample:\n  use express').value;
     return { type: 'UseStatement', module };
+  }
+
+  // when someone visits "<path>" ... done
+  function parseRoute() {
+    consume(TOKEN.WHEN);
+    consume(TOKEN.SOMEONE, 'Expected "someone" after "when".\n\nExample:\n  when someone visits "/"\n    reply "Hello"\n  done');
+    consume(TOKEN.VISITS,  'Expected "visits" after "someone".\n\nExample:\n  when someone visits "/"');
+    const routePath = consume(TOKEN.STRING, 'Expected a route path string after "visits".\n\nExample:\n  when someone visits "/"').value;
+    const body = parseBody('route');
+    return { type: 'RouteStatement', path: routePath, body };
+  }
+
+  // listen on <port> ... done
+  function parseListen() {
+    consume(TOKEN.LISTEN);
+    consume(TOKEN.ON, 'Expected "on" after "listen".\n\nExample:\n  listen on 3000\n    show "Running"\n  done');
+    const port = parseExpression();
+    const body = parseBody('"listen" block');
+    return { type: 'ListenStatement', port, body };
+  }
+
+  // reply <expr>
+  // reply json\n  <key> is <val>\n...\ndone
+  function parseReply() {
+    consume(TOKEN.REPLY);
+    if (peek().type === TOKEN.JSON_KW) {
+      advance(); // consume json
+      const properties = [];
+      while (peek().type !== TOKEN.DONE) {
+        if (peek().type === TOKEN.EOF) {
+          throw new Error('Expected keyword "done" to close "reply json" block before end of file.');
+        }
+        const key = consume(TOKEN.IDENTIFIER, 'Expected a property name.').value;
+        consume(TOKEN.IS, `Expected "is" after property name "${key}".`);
+        const value = parseExpression();
+        properties.push({ key, value });
+      }
+      advance(); // consume DONE
+      return { type: 'ReplyJsonStatement', properties };
+    }
+    const value = parseExpression();
+    return { type: 'ReplyStatement', value };
+  }
+
+  // serve folder "<path>"
+  function parseServeFolder() {
+    consume(TOKEN.SERVE);
+    consume(TOKEN.FOLDER, 'Expected "folder" after "serve".\n\nExample:\n  serve folder "public"');
+    const folder = consume(TOKEN.STRING, 'Expected a folder path string after "serve folder".\n\nExample:\n  serve folder "public"').value;
+    return { type: 'ServeFolderStatement', folder };
   }
 
   // ── Conditions ─────────────────────────────────────────────────────────────
 
-  // if <expr> <comparison> <expr>  [body]  [otherwise [body]]  done
   function parseIf() {
     consume(TOKEN.IF);
     const left     = parseExpression();
@@ -229,7 +282,6 @@ function parse(tokens) {
 
   // ── Shared helpers ──────────────────────────────────────────────────────────
 
-  // Parses statements until DONE; used by make, for each, while.
   function parseBody(context) {
     const body = [];
     while (peek().type !== TOKEN.DONE) {
@@ -257,25 +309,22 @@ function parse(tokens) {
   }
 
   // primary → atom (postfix)*
-  // postfix  → '[' expr ']'  |  '.' IDENTIFIER
   function parsePrimary() {
     let node = parseAtom();
-
     while (true) {
       if (peek().type === TOKEN.LBRACKET) {
-        advance(); // consume [
+        advance();
         const index = parseExpression();
         consume(TOKEN.RBRACKET, 'Expected "]" to close the index.');
         node = { type: 'IndexExpression', object: node, index };
       } else if (peek().type === TOKEN.DOT) {
-        advance(); // consume .
+        advance();
         const property = consume(TOKEN.IDENTIFIER, 'Expected a property name after ".".').value;
         node = { type: 'MemberExpression', object: node, property };
       } else {
         break;
       }
     }
-
     return node;
   }
 
@@ -314,7 +363,6 @@ function parse(tokens) {
   }
 
   // Object literal body: key is value  ...  done
-  // Called after `remember name as` when IDENTIFIER IS is detected.
   function parseObjectLiteral() {
     const properties = [];
     while (peek().type !== TOKEN.DONE) {
@@ -332,7 +380,7 @@ function parse(tokens) {
 
   // name(arg, arg, ...)
   function parseCallExpression() {
-    const name = advance().value; // consume IDENTIFIER
+    const name = advance().value;
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
     const args = parseArgList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the argument list.');

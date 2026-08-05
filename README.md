@@ -9,13 +9,10 @@ Plain is an Intent-Oriented Programming Language (IOPL). You describe **what** y
 ## Quick start
 
 ```bash
-node compiler/cli.js run examples/hello.pln
-```
-
-Or after `npm install -g .`:
-
-```bash
-plain run examples/hello.pln
+npm install -g @ayoxx/plain-code
+plain new myapp
+cd myapp && npm install
+plain run app.pln
 ```
 
 ---
@@ -25,6 +22,7 @@ plain run examples/hello.pln
 ```
 plain run   <file.pln>   Compile and execute a Plain program
 plain build <file.pln>   Compile to JavaScript without running
+plain new   [name]       Scaffold a new Plain project
 plain version            Print the compiler version
 plain help               Print help text
 ```
@@ -38,15 +36,7 @@ plain help               Print help text
 ```plain
 remember name as "Ayokunle"
 remember age as 16
-
 age becomes 17
-```
-
-### Printing
-
-```plain
-show "Hello"
-show age
 ```
 
 ### Conditions
@@ -59,30 +49,21 @@ otherwise
 done
 ```
 
-Comparisons: `is`, `is greater than`, `is less than`
-
 ### Functions
 
 ```plain
 make add(a, b)
     give a + b
 done
-
 show add(5, 7)
 ```
 
 ### Arrays
 
 ```plain
-remember players as [
-    "Haaland",
-    "Foden",
-    "Rodri"
-]
-
+remember players as ["Haaland", "Foden", "Rodri"]
 show players[0]
 players[1] becomes "Palmer"
-show length(players)
 ```
 
 ### Objects
@@ -91,9 +72,7 @@ show length(players)
 remember user as
     name is "Ayokunle"
     age is 17
-    country is "Nigeria"
 done
-
 show user.name
 user.age becomes 18
 ```
@@ -112,20 +91,65 @@ done
 
 ### Standard library
 
-| Plain           | Does                      |
-|-----------------|---------------------------|
-| `length(x)`     | Length of array or string |
-| `uppercase(x)`  | Convert to uppercase      |
-| `lowercase(x)`  | Convert to lowercase      |
-| `random()`      | Random number 0–1         |
-| `round(x)`      | Round to nearest integer  |
+| Plain           | Does                     |
+|-----------------|--------------------------|
+| `length(x)`     | Length of array/string   |
+| `uppercase(x)`  | Convert to uppercase     |
+| `lowercase(x)`  | Convert to lowercase     |
+| `random()`      | Random number 0–1        |
+| `round(x)`      | Round to nearest integer |
 
-### Imports (parser only)
+---
+
+## Express server (v0.3)
 
 ```plain
-use math
-use sqlite
+use express
+
+remember app as express()
+
+serve folder "public"
+
+when someone visits "/"
+    reply "Hello from Plain!"
+done
+
+when someone visits "/api/status"
+    reply json
+        status is "ok"
+        version is "0.3"
+    done
+done
+
+listen on 3000
+    show "Server running at http://localhost:3000"
+done
 ```
+
+Inside route bodies, `request` maps to `req` and `response` maps to `res`.
+
+---
+
+## SQLite (v0.3)
+
+```plain
+use sqlite
+
+remember db as sqlite("database.db")
+```
+
+---
+
+## Supported packages
+
+| Plain          | Compiles to                              |
+|----------------|------------------------------------------|
+| `use express`  | `const express = require('express');`    |
+| `use sqlite`   | `const Database = require('better-sqlite3');` |
+| `use fs`       | `const fs = require('fs');`              |
+| `use path`     | `const path = require('path');`          |
+
+Unknown packages produce a friendly compiler error.
 
 ---
 
@@ -133,8 +157,6 @@ use sqlite
 
 ```bash
 npm test
-# or
-node tests/compiler.test.js
 ```
 
 ---
@@ -155,27 +177,16 @@ Plain/
 │   ├── day3.pln       — functions
 │   ├── arrays.pln     — arrays and indexing
 │   ├── objects.pln    — objects and property access
-│   └── loops.pln      — for each and while loops
+│   ├── loops.pln      — for each and while loops
+│   ├── server.pln     — Express server (v0.3)
+│   └── database.pln   — SQLite connection (v0.3)
 │
 ├── tests/
 │   └── compiler.test.js
 │
 ├── docs/
-│   └── PLAIN_SPEC.md  — language specification (v0.2)
+│   └── PLAIN_SPEC.md  — language specification (v0.3)
 │
 ├── package.json
 └── README.md
 ```
-
----
-
-## npm
-
-This package is prepared for npm publishing (not yet published).
-
-```bash
-npm install        # install locally
-npm install -g .   # install globally as "plain"
-```
-
-After global install, use `plain run file.pln` from anywhere.

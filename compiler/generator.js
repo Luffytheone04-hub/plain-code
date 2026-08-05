@@ -1,14 +1,27 @@
 // Generator: converts a Plain AST into JavaScript source code.
 
+// Known runtime packages and their require() statements.
+const KNOWN_PACKAGES = {
+  express: `const express = require('express');`,
+  sqlite:  `const Database = require('better-sqlite3');`,
+  fs:      `const fs = require('fs');`,
+  path:    `const path = require('path');`,
+};
+
 // Built-in stdlib functions: Plain name → JS code generator.
-// These compile directly to JS equivalents with no runtime dependency.
 const STDLIB = {
   length:    (args) => `(${generateExpr(args[0])}).length`,
   uppercase: (args) => `(${generateExpr(args[0])}).toUpperCase()`,
   lowercase: (args) => `(${generateExpr(args[0])}).toLowerCase()`,
   random:    (_args) => `Math.random()`,
   round:     (args) => `Math.round(${generateExpr(args[0])})`,
+  // Runtime constructors
+  sqlite:    (args) => `new Database(${args.map(generateExpr).join(', ')})`,
 };
+
+// Set to true while generating inside a route handler body.
+// Remaps Plain's "request" → "req" and "response" → "res".
+let _inRoute = false;
 
 function generate(ast) {
   if (ast.type !== 'Program') {
@@ -34,8 +47,15 @@ function generateStatement(node, indent = '') {
     case 'ExpressionStatement':
       return `${indent}${generateExpr(node.expression)};`;
 
-    case 'UseStatement':
-      return `${indent}// use ${node.module} (runtime not yet available)`;
+    case 'UseStatement': {
+      const pkg = KNOWN_PACKAGES[node.module];
+      if (!pkg) {
+        throw new Error(
+          `Unknown package "${node.module}".\n\nPlain supports: ${Object.keys(KNOWN_PACKAGES).join(', ')}.\n\nExample:\n  use express`
+        );
+      }
+      return `${indent}${pkg}`;
+    }
 
     case 'FunctionDeclaration': {
       const params = node.params.join(', ');
@@ -65,6 +85,33 @@ function generateStatement(node, indent = '') {
       return `${indent}while (${condition}) {\n${body}\n${indent}}`;
     }
 
+    // v0.3 — Express runtime
+
+    case 'ListenStatement': {
+      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      return `${indent}app.listen(${generateExpr(node.port)}, () => {\n${body}\n${indent}});`;
+    }
+
+    case 'RouteStatement': {
+      _inRoute = true;
+      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      _inRoute = false;
+      return `${indent}app.get(${JSON.stringify(node.path)}, (req, res) => {\n${body}\n${indent}});`;
+    }
+
+    case 'ReplyStatement':
+      return `${indent}res.send(${generateExpr(node.value)});`;
+
+    case 'ReplyJsonStatement': {
+      const props = node.properties
+        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value)}`)
+        .join(', ');
+      return `${indent}res.json({ ${props} });`;
+    }
+
+    case 'ServeFolderStatement':
+      return `${indent}app.use(express.static(${JSON.stringify(node.folder)}));`;
+
     default:
       throw new Error(`Unknown statement type "${node.type}".`);
   }
@@ -72,8 +119,8 @@ function generateStatement(node, indent = '') {
 
 // Generates a valid JS assignment target (left-hand side of =).
 function generateLValue(node) {
-  if (node.type === 'Identifier')      return node.name;
-  if (node.type === 'IndexExpression') return `${generateExpr(node.object)}[${generateExpr(node.index)}]`;
+  if (node.type === 'Identifier')       return node.name;
+  if (node.type === 'IndexExpression')  return `${generateExpr(node.object)}[${generateExpr(node.index)}]`;
   if (node.type === 'MemberExpression') return `${generateExpr(node.object)}.${node.property}`;
   throw new Error(`Invalid assignment target "${node.type}".`);
 }
@@ -82,12 +129,18 @@ function generateExpr(node) {
   switch (node.type) {
     case 'StringLiteral':    return JSON.stringify(node.value);
     case 'NumberLiteral':    return String(node.value);
-    case 'Identifier':       return node.name;
+
+    case 'Identifier': {
+      // Inside route handlers, remap Plain's request/response to req/res
+      if (_inRoute && node.name === 'request')  return 'req';
+      if (_inRoute && node.name === 'response') return 'res';
+      return node.name;
+    }
+
     case 'BinaryExpression': return `${generateExpr(node.left)} ${node.operator} ${generateExpr(node.right)}`;
 
     case 'ArrayLiteral': {
-      const elements = node.elements.map(generateExpr).join(', ');
-      return `[${elements}]`;
+      return `[${node.elements.map(generateExpr).join(', ')}]`;
     }
 
     case 'ObjectLiteral': {

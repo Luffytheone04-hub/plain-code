@@ -1,7 +1,7 @@
 // Lexer: converts Plain source text into a stream of tokens.
 
 const TOKEN = {
-  // Keywords
+  // Core keywords
   REMEMBER:   'REMEMBER',
   SHOW:       'SHOW',
   AS:         'AS',
@@ -20,6 +20,16 @@ const TOKEN = {
   IN:         'IN',
   WHILE:      'WHILE',
   USE:        'USE',
+  // v0.3 — runtime keywords
+  WHEN:       'WHEN',
+  SOMEONE:    'SOMEONE',
+  VISITS:     'VISITS',
+  LISTEN:     'LISTEN',
+  ON:         'ON',
+  REPLY:      'REPLY',
+  JSON_KW:    'JSON_KW',
+  SERVE:      'SERVE',
+  FOLDER:     'FOLDER',
   // Punctuation
   LPAREN:     'LPAREN',
   RPAREN:     'RPAREN',
@@ -55,6 +65,15 @@ const KEYWORDS = {
   in:        TOKEN.IN,
   while:     TOKEN.WHILE,
   use:       TOKEN.USE,
+  when:      TOKEN.WHEN,
+  someone:   TOKEN.SOMEONE,
+  visits:    TOKEN.VISITS,
+  listen:    TOKEN.LISTEN,
+  on:        TOKEN.ON,
+  reply:     TOKEN.REPLY,
+  json:      TOKEN.JSON_KW,
+  serve:     TOKEN.SERVE,
+  folder:    TOKEN.FOLDER,
 };
 
 function tokenize(source) {
@@ -102,13 +121,13 @@ function tokenize(source) {
     }
 
     // Single-character punctuation
-    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,    value: '(' }); i++; continue; }
-    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,    value: ')' }); i++; continue; }
-    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET,  value: '[' }); i++; continue; }
-    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET,  value: ']' }); i++; continue; }
-    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,     value: ',' }); i++; continue; }
-    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,       value: '.' }); i++; continue; }
-    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,      value: '+' }); i++; continue; }
+    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(' }); i++; continue; }
+    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')' }); i++; continue; }
+    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[' }); i++; continue; }
+    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']' }); i++; continue; }
+    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',' }); i++; continue; }
+    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.' }); i++; continue; }
+    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+' }); i++; continue; }
 
     throw new Error(
       `Unexpected character "${source[i]}" at position ${i}. Plain only uses letters, numbers, strings, and known symbols.`

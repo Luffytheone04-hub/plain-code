@@ -1,30 +1,24 @@
-# Plain Language Specification (v0.2)
+# Plain Language Specification (v0.3)
 
-Version: 0.2
+Version: 0.3
 Status: Draft
 File Extension: .pln
 
-Tagline
+Tagline: "When even a simple sentence can be code."
 
-"When even a simple sentence can be code."
+---
 
-Mission
+## Mission
 
 Plain is an Intent-Oriented Programming Language (IOPL).
 
 Its goal is to let developers describe WHAT they want while the compiler decides HOW JavaScript should implement it.
 
-Plain is designed to be:
-
-- Beginner friendly
-- Readable
-- Predictable
-- Consistent
-- Easy to teach
+Plain is designed to be: beginner-friendly, readable, predictable, consistent, and easy to teach.
 
 Every keyword should be understandable by a 12-year-old.
 
-----------------------------------------
+---
 
 ## Core Principles
 
@@ -35,15 +29,13 @@ Every keyword should be understandable by a 12-year-old.
 5. JavaScript is an implementation detail.
 6. Code should read like documentation.
 
-----------------------------------------
+---
 
 ## Comments
 
-Single line
-
     // This is a comment
 
-----------------------------------------
+---
 
 ## Variables
 
@@ -56,7 +48,7 @@ Reassign:
 
     age becomes 17
 
-----------------------------------------
+---
 
 ## Printing
 
@@ -65,7 +57,7 @@ Reassign:
     show players[0]
     show user.name
 
-----------------------------------------
+---
 
 ## Conditions
 
@@ -75,13 +67,9 @@ Reassign:
         show "Minor"
     done
 
-Comparison keywords:
+Comparisons: `is`, `is greater than`, `is less than`
 
-    is
-    is greater than
-    is less than
-
-----------------------------------------
+---
 
 ## Functions
 
@@ -91,19 +79,15 @@ Comparison keywords:
 
     greet()
 
-Returning values:
-
     make add(a, b)
         give a + b
     done
 
     show add(5, 7)
 
-----------------------------------------
+---
 
 ## Arrays
-
-Declare:
 
     remember players as [
         "Haaland",
@@ -111,19 +95,12 @@ Declare:
         "Rodri"
     ]
 
-Index:
-
     show players[0]
-
-Assign by index:
-
     players[1] becomes "Palmer"
 
-----------------------------------------
+---
 
 ## Objects
-
-Declare:
 
     remember user as
         name is "Ayokunle"
@@ -131,15 +108,10 @@ Declare:
         country is "Nigeria"
     done
 
-Property access:
-
     show user.name
-
-Property assignment:
-
     user.age becomes 18
 
-----------------------------------------
+---
 
 ## Loops
 
@@ -149,48 +121,114 @@ For each:
         show player
     done
 
-Generates: for (const player of players) { ... }
-
 While:
 
     while age is less than 18
         age becomes age + 1
     done
 
-Generates: while (age < 18) { ... }
-
-----------------------------------------
+---
 
 ## Standard Library
 
-Built-in functions that compile to JavaScript equivalents:
+| Plain           | JavaScript equivalent   |
+|-----------------|-------------------------|
+| length(x)       | (x).length              |
+| uppercase(x)    | (x).toUpperCase()       |
+| lowercase(x)    | (x).toLowerCase()       |
+| random()        | Math.random()           |
+| round(x)        | Math.round(x)           |
 
-| Plain              | JavaScript equivalent          |
-|--------------------|-------------------------------|
-| length(x)          | (x).length                    |
-| uppercase(text)    | (text).toUpperCase()          |
-| lowercase(text)    | (text).toLowerCase()          |
-| random()           | Math.random()                 |
-| round(number)      | Math.round(number)            |
+---
 
-Example:
+## Imports / Packages
 
-    show length(players)
-    show uppercase("hello")
-    show round(3.7)
+Supported packages:
 
-----------------------------------------
+    use express    → const express = require('express');
+    use sqlite     → const Database = require('better-sqlite3');
+    use fs         → const fs = require('fs');
+    use path       → const path = require('path');
 
-## Imports
+Unknown packages produce a friendly compiler error.
 
-Syntax (parser support only; runtime not yet available):
+---
 
-    use math
+## Express Server (v0.3)
+
+    use express
+
+    remember app as express()
+
+    serve folder "public"
+
+    when someone visits "/"
+        reply "Hello from Plain!"
+    done
+
+    when someone visits "/api/status"
+        reply json
+            status is "ok"
+            version is "0.3"
+        done
+    done
+
+    listen on 3000
+        show "Server running at http://localhost:3000"
+    done
+
+### Routes
+
+    when someone visits "<path>"
+        ...
+    done
+
+Compiles to: `app.get(path, (req, res) => { ... })`
+
+Inside route bodies:
+
+- `request` → `req`
+- `response` → `res`
+
+### Sending responses
+
+    reply "Hello"          → res.send("Hello")
+    reply user             → res.send(user)
+
+### JSON responses
+
+    reply json
+        name is "Plain"
+        version is "0.3"
+    done
+
+Compiles to: `res.json({ "name": "Plain", "version": "0.3" })`
+
+### Static files
+
+    serve folder "public"
+
+Compiles to: `app.use(express.static("public"))`
+
+### Listening
+
+    listen on 3000
+        show "Running"
+    done
+
+Compiles to: `app.listen(3000, () => { ... })`
+
+---
+
+## SQLite (v0.3)
+
     use sqlite
 
-Compiles to a placeholder comment.
+    remember db as sqlite("database.db")
 
-----------------------------------------
+Compiles to: `new Database("database.db")`
+
+---
 
 ## Reserved Keywords
 
@@ -200,11 +238,15 @@ Compiles to a placeholder comment.
     for       each       in
     while
     use
+    when      someone   visits
+    listen    on
+    reply     json
+    serve     folder
     is        greater    less    than
     true      false
     note
 
-----------------------------------------
+---
 
 This document is the single source of truth for Plain.
 Every compiler implementation must follow this specification.

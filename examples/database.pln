@@ -1,0 +1,6 @@
+use sqlite
+
+remember db as sqlite("app.db")
+
+show "Database connection created"
+show db
