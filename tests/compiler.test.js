@@ -1065,9 +1065,279 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 0.4.2', () => {
+test('plain version shows 0.5.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.4.2')) throw new Error(`Expected version 0.4.2 but got: ${out}`);
+  if (!out.includes('0.5.0')) throw new Error(`Expected version 0.5.0 but got: ${out}`);
+});
+
+// ── v0.5 — Formatter ─────────────────────────────────────────────────────────
+
+console.log('\nv0.5 — Formatter');
+
+const { format } = require('../compiler/formatter');
+
+test('format: removes trailing whitespace', () => {
+  const result = format('remember x as 1   \nshow x   ');
+  if (result.includes('   ')) throw new Error('trailing whitespace not removed');
+});
+
+test('format: normalises indentation inside a function', () => {
+  const src = 'make add(a, b)\ngive a + b\ndone';
+  const result = format(src);
+  if (!result.includes('    give a + b')) throw new Error('body not indented with 4 spaces');
+});
+
+test('format: normalises indentation inside an if block', () => {
+  const src = 'remember x as 1\nif x is 1\nshow "yes"\ndone';
+  const result = format(src);
+  if (!result.includes('    show "yes"')) throw new Error('if body not indented');
+});
+
+test('format: collapses multiple blank lines into one', () => {
+  const src = 'show "a"\n\n\n\nshow "b"';
+  const result = format(src);
+  const doubled = result.includes('\n\n\n');
+  if (doubled) throw new Error('multiple blank lines not collapsed');
+});
+
+test('format: one blank line between top-level blocks', () => {
+  const src = 'make greet()\nshow "hi"\ndone\nmake bye()\nshow "bye"\ndone';
+  const result = format(src);
+  if (!result.includes('done\n\nmake')) throw new Error('missing blank line between functions');
+});
+
+test('format: dedents "otherwise" keyword', () => {
+  const src = 'if x is 1\nshow "yes"\notherwise\nshow "no"\ndone';
+  const result = format(src);
+  if (!result.match(/^otherwise/m)) throw new Error('"otherwise" not at depth 0');
+});
+
+test('format: dedents "done" keyword', () => {
+  const src = 'make f()\nshow "hi"\ndone';
+  const result = format(src);
+  if (!result.match(/^done/m)) throw new Error('"done" not at depth 0');
+});
+
+test('format: output ends with a single newline', () => {
+  const result = format('show "hello"');
+  if (!result.endsWith('\n'))   throw new Error('output does not end with newline');
+  if (result.endsWith('\n\n')) throw new Error('output ends with double newline');
+});
+
+test('format: strips leading blank lines', () => {
+  const result = format('\n\nshow "hi"');
+  if (result.startsWith('\n')) throw new Error('leading blank lines not stripped');
+});
+
+test('format: idempotent — formatting twice gives the same result', () => {
+  const src = 'make add(a, b)\ngive a + b\ndone\nremember x as 1\nshow x';
+  const once  = format(src);
+  const twice = format(once);
+  if (once !== twice) throw new Error('format is not idempotent');
+});
+
+test('format: no blank lines inserted between consecutive non-block statements', () => {
+  const src = 'remember x as 1\nremember y as 2\nshow x\nshow y';
+  const result = format(src);
+  // None of the lines should be separated by blank lines
+  if (result.includes('\n\n')) {
+    throw new Error(`Unexpected blank line between simple statements:\n${result}`);
+  }
+});
+
+test('format: array elements are indented', () => {
+  const src = 'remember players as [\n"Haaland",\n"Foden",\n]';
+  const result = format(src);
+  if (!result.includes('    "Haaland"')) {
+    throw new Error(`Array elements not indented:\n${result}`);
+  }
+  if (!result.includes('    "Foden"')) {
+    throw new Error(`Array elements not indented:\n${result}`);
+  }
+});
+
+test('format: closing bracket is not indented', () => {
+  const src = 'remember players as [\n"Haaland",\n"Foden",\n]';
+  const result = format(src);
+  if (!result.match(/^\]/m)) {
+    throw new Error(`Closing bracket should be at column 0:\n${result}`);
+  }
+});
+
+test('format: no blank lines between array elements', () => {
+  const src = 'remember players as [\n"Haaland",\n"Foden",\n"Rodri",\n]';
+  const result = format(src);
+  if (result.includes('"Haaland",\n\n') || result.includes('"Foden",\n\n')) {
+    throw new Error(`Blank lines found between array elements:\n${result}`);
+  }
+});
+
+// ── v0.5 — plain check ───────────────────────────────────────────────────────
+
+console.log('\nv0.5 — plain check');
+
+test('plain check exits 0 on valid file', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'ok.pln');
+  fs.writeFileSync(plnFile, 'remember x as 1\nshow x\n');
+  const out = runCli(['check', plnFile], dir);
+  if (!out.includes('no errors found')) {
+    throw new Error(`Expected "no errors found" but got: ${out}`);
+  }
+});
+
+test('plain check reports error on invalid file', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'bad.pln');
+  fs.writeFileSync(plnFile, 'remembr x as 1\n');
+  const out = runCli(['check', plnFile], dir);
+  if (!out.toLowerCase().includes('did you mean')) {
+    throw new Error(`Expected "did you mean" suggestion but got: ${out}`);
+  }
+});
+
+test('plain check includes line number in error', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'bad.pln');
+  fs.writeFileSync(plnFile, 'remember x as 1\nremembr y as 2\n');
+  const out = runCli(['check', plnFile], dir);
+  if (!out.toLowerCase().includes('line')) {
+    throw new Error(`Expected line info in error but got: ${out}`);
+  }
+});
+
+test('plain check includes filename in error', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'bad.pln');
+  fs.writeFileSync(plnFile, 'remember x as 1\nremembr y as 2\n');
+  const out = runCli(['check', plnFile], dir);
+  if (!out.includes('bad.pln')) {
+    throw new Error(`Expected filename "bad.pln" in error but got: ${out}`);
+  }
+});
+
+test('plain check errors without file argument', () => {
+  const dir = tmpDir();
+  const out = runCli(['check'], dir);
+  if (!out.toLowerCase().includes('usage')) {
+    throw new Error(`Expected usage message but got: ${out}`);
+  }
+});
+
+test('plain check errors on missing file', () => {
+  const dir = tmpDir();
+  const out = runCli(['check', 'does_not_exist.pln'], dir);
+  if (!out.toLowerCase().includes('not found')) {
+    throw new Error(`Expected "not found" error but got: ${out}`);
+  }
+});
+
+// ── v0.5 — plain fmt ─────────────────────────────────────────────────────────
+
+console.log('\nv0.5 — plain fmt');
+
+test('plain fmt formats file in-place', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'make add(a, b)\ngive a + b\ndone\n');
+  runCli(['fmt', plnFile], dir);
+  const result = fs.readFileSync(plnFile, 'utf8');
+  if (!result.includes('    give a + b')) {
+    throw new Error(`Expected indented body after fmt but got:\n${result}`);
+  }
+});
+
+test('plain fmt reports success message', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'show "hello"\n');
+  const out = runCli(['fmt', plnFile], dir);
+  if (!out.toLowerCase().includes('formatted')) {
+    throw new Error(`Expected "formatted" in output but got: ${out}`);
+  }
+});
+
+test('plain fmt errors without file argument', () => {
+  const dir = tmpDir();
+  const out = runCli(['fmt'], dir);
+  if (!out.toLowerCase().includes('usage')) {
+    throw new Error(`Expected usage message but got: ${out}`);
+  }
+});
+
+test('plain fmt errors on missing file', () => {
+  const dir = tmpDir();
+  const out = runCli(['fmt', 'does_not_exist.pln'], dir);
+  if (!out.toLowerCase().includes('not found')) {
+    throw new Error(`Expected "not found" error but got: ${out}`);
+  }
+});
+
+// ── v0.5 — Diagnostics (line + column in errors) ─────────────────────────────
+
+console.log('\nv0.5 — Diagnostics');
+
+test('parse error includes Line N', () => {
+  try {
+    compile('remember x as 1\nif x is 1\nshow "oops"');
+    throw new Error('expected error');
+  } catch (e) {
+    if (!e.message.match(/Line \d+/)) {
+      throw new Error(`Expected "Line N" in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('parse error includes Column N', () => {
+  try {
+    compile('remember x as 1\nif x is 1\nshow "oops"');
+    throw new Error('expected error');
+  } catch (e) {
+    if (!e.message.match(/Column \d+/)) {
+      throw new Error(`Expected "Column N" in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('misspelled keyword error includes line number', () => {
+  try {
+    compile('remember x as 1\nshwo x');
+    throw new Error('expected error');
+  } catch (e) {
+    if (!e.message.match(/Line \d+/)) {
+      throw new Error(`Expected "Line N" in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('unknown keyword suggestion includes "Did you mean"', () => {
+  try {
+    compile('remembr x as 1');
+    throw new Error('expected error');
+  } catch (e) {
+    if (!e.message.includes('Did you mean')) {
+      throw new Error(`Expected "Did you mean" but got: ${e.message}`);
+    }
+  }
+});
+
+// ── v0.5 — CLI help & version ─────────────────────────────────────────────────
+
+console.log('\nv0.5 — CLI help & version');
+
+test('plain help includes "plain check"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain check')) throw new Error(`"plain check" missing from help. Got:\n${out}`);
+});
+
+test('plain help includes "plain fmt"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
+});
+
+test('plain version shows 0.5.0', () => {
+  const out = runCli(['version'], process.cwd());
+  if (!out.includes('0.5.0')) throw new Error(`Expected version 0.5.0 but got: ${out}`);
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

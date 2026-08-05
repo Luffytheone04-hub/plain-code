@@ -23,6 +23,8 @@ plain run app.pln
 ```
 plain run    <file.pln>   Compile and execute a Plain program
 plain build  <file.pln>   Compile to JavaScript without running
+plain check  <file.pln>   Check syntax only (no output, no execution)
+plain fmt    <file.pln>   Format a Plain file in-place
 plain new    [name]       Create a new Plain project
 plain init               Create a plain.json in the current directory
 plain install            Install dependencies listed in plain.json

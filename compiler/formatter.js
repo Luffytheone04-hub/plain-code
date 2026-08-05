@@ -3,9 +3,9 @@
 // Rules applied:
 //   - Consistent 4-space indentation
 //   - Remove trailing whitespace from every line
-//   - One blank line between top-level blocks (after "done" at depth 0)
+//   - One blank line between top-level block declarations (make, if, for each, etc.)
 //   - Collapse multiple consecutive blank lines into one
-//   - Normalise inline spacing (single space between tokens on a line)
+//   - Indent multi-line array elements ([...]) relative to their enclosing block
 
 const INDENT = '    '; // 4 spaces
 
@@ -13,7 +13,6 @@ const INDENT = '    '; // 4 spaces
 const DEDENT_WORDS = new Set(['done', 'otherwise']);
 
 // Patterns whose line OPENS a new block (next line indented).
-// The set is checked against the trimmed line's leading text.
 const INDENT_STARTERS = [
   /^make\s+\S+\s*\(/,          // make name(...)
   /^if\s+/,                    // if ...
@@ -30,21 +29,50 @@ function opensBlock(line) {
   return INDENT_STARTERS.some(re => re.test(line));
 }
 
+// Count occurrences of ch in a line, ignoring characters inside double-quoted
+// strings and after // comments.
+function countUnquoted(line, ch) {
+  let count = 0;
+  let inString = false;
+  for (let i = 0; i < line.length; i++) {
+    if (!inString && line[i] === '/' && line[i + 1] === '/') break; // rest is a comment
+    if (line[i] === '"' && (i === 0 || line[i - 1] !== '\\')) inString = !inString;
+    if (!inString && line[i] === ch) count++;
+  }
+  return count;
+}
+
 // Format a single Plain source string and return the formatted version.
 function format(source) {
-  const rawLines = source.split('\n');
-  const output   = [];
-  let depth = 0;
+  const rawLines   = source.split('\n');
+  const output     = [];
+  let depth        = 0;  // keyword block depth (make/if/for each/done …)
+  let bracketDepth = 0;  // bracket nesting depth for multi-line [ … ]
 
   for (let i = 0; i < rawLines.length; i++) {
     const stripped = rawLines[i].replace(/\s+$/, ''); // remove trailing whitespace
     const content  = stripped.trim();
 
-    // Preserve (collapsed) blank lines — handle below
+    // Blank lines are preserved outside brackets; suppressed inside them.
     if (content === '') {
-      output.push('');
+      if (bracketDepth === 0) output.push('');
       continue;
     }
+
+    const opens  = countUnquoted(content, '[');
+    const closes = countUnquoted(content, ']');
+
+    // ── Inside a multi-line array [ … ] ──────────────────────────────────────
+    if (bracketDepth > 0) {
+      // Use the lower bracket depth so a closing ] de-indents before printing.
+      const nextBracketDepth = bracketDepth + opens - closes;
+      const indentLevel      = depth + Math.min(bracketDepth, nextBracketDepth);
+      output.push(INDENT.repeat(Math.max(0, indentLevel)) + content);
+      bracketDepth = Math.max(0, nextBracketDepth);
+      continue;
+    }
+
+    // ── Normal line ───────────────────────────────────────────────────────────
 
     const firstWord = content.split(/\s+/)[0];
 
@@ -53,14 +81,14 @@ function format(source) {
       depth--;
     }
 
-    // Before printing a top-level block start, ensure exactly one blank line
-    // separates it from the previous non-blank content (unless it's the first line).
-    if (depth === 0 && output.length > 0) {
-      // Find the last non-empty line index in output.
+    // Insert exactly one blank line before a top-level block-opening statement
+    // (e.g. make, if, for each) when prior content exists.
+    // Simple statements like remember/show/becomes are NOT block openers and
+    // do NOT get a blank line inserted before them.
+    if (depth === 0 && opensBlock(content) && output.length > 0) {
       let lastNonEmpty = output.length - 1;
       while (lastNonEmpty >= 0 && output[lastNonEmpty] === '') lastNonEmpty--;
 
-      // If there's content before this and no blank line gap, add one.
       if (lastNonEmpty >= 0 && output[output.length - 1] !== '') {
         output.push('');
       }
@@ -72,6 +100,9 @@ function format(source) {
     if (opensBlock(content)) {
       depth++;
     }
+
+    // Update bracket depth for multi-line arrays starting on this line.
+    bracketDepth = Math.max(0, bracketDepth + opens - closes);
   }
 
   // Collapse consecutive blank lines into one.
@@ -85,7 +116,7 @@ function format(source) {
   }
 
   // Strip leading and trailing blank lines, then add a single trailing newline.
-  while (collapsed.length > 0 && collapsed[0]             === '') collapsed.shift();
+  while (collapsed.length > 0 && collapsed[0]                    === '') collapsed.shift();
   while (collapsed.length > 0 && collapsed[collapsed.length - 1] === '') collapsed.pop();
 
   return collapsed.join('\n') + '\n';

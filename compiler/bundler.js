@@ -44,10 +44,18 @@ function resolveDependencies(entryPath) {
       );
     }
 
-    // Parse the file to discover its own imports
+    // Parse the file to discover its own imports.
+    // Annotate any tokenise/parse error with the filename so callers see
+    // "file.pln — Line N, Column N: …" rather than a bare positional message.
     const source = fs.readFileSync(absPath, 'utf8');
-    const tokens = tokenize(source);
-    const ast    = parse(tokens);
+    let tokens, ast;
+    try {
+      tokens = tokenize(source);
+      ast    = parse(tokens);
+    } catch (err) {
+      const relPath = path.relative(process.cwd(), absPath) || path.basename(absPath);
+      throw new Error(`${relPath} — ${err.message}`);
+    }
 
     // Recurse into each import before processing this file (DFS)
     const newStack = [...stack, absPath];

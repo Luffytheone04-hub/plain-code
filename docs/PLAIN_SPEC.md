@@ -1,6 +1,6 @@
-# Plain Language Specification (v0.4.2)
+# Plain Language Specification (v0.5.0)
 
-Version: 0.4.2
+Version: 0.5.0
 Status: Draft
 File Extension: .pln
 
@@ -261,6 +261,46 @@ Compiles to: `app.listen(3000, () => { ... })`
     remember db as sqlite("database.db")
 
 Compiles to: `new Database("database.db")`
+
+---
+
+## Developer Experience (v0.5.0)
+
+### Formatter
+
+Format a Plain file in-place:
+
+    plain fmt app.pln
+
+Formatting rules:
+
+- 4-space consistent indentation
+- Trailing whitespace removed from every line
+- One blank line between top-level blocks
+- Multiple consecutive blank lines collapsed into one
+
+### Syntax Checker
+
+Check syntax without generating JavaScript or running anything:
+
+    plain check app.pln
+
+Exits with code 0 if no errors are found. Exits with code 1 and prints a
+friendly error (with line, column, and suggestion where possible) if the
+file contains a syntax error.
+
+### VS Code Extension
+
+Install `plain-vscode` for:
+
+- Syntax highlighting
+- File icon for `.pln` files
+- Auto-closing pairs: `()` `[]` `{}` `""`
+- Comment toggling (`//`)
+- Bracket matching
+- Code folding
+
+See `plain-vscode/README.md` for installation instructions.
 
 ---
 

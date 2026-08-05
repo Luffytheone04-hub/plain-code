@@ -4,6 +4,8 @@
 // Usage:
 //   plain run    <file.pln>   compile and execute
 //   plain build  <file.pln>   compile to JavaScript (outputs <file>.js)
+//   plain check  <file.pln>   check syntax only (no JS generated, no execution)
+//   plain fmt    <file.pln>   format a Plain file in-place
 //   plain new    [name]       scaffold a new Plain project
 //   plain init               create plain.json in the current directory
 //   plain install            install dependencies from plain.json
@@ -20,8 +22,9 @@ const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
+const { format }   = require('./formatter');
 
-const VERSION = '0.4.2';
+const VERSION = '0.5.0';
 
 const HELP = `
 Plain v${VERSION} — Intent-Oriented Programming Language
@@ -30,6 +33,8 @@ Commands
 
   plain run    <file.pln>   Compile and execute a Plain program
   plain build  <file.pln>   Compile to JavaScript without running
+  plain check  <file.pln>   Check syntax only (no output, no execution)
+  plain fmt    <file.pln>   Format a Plain file in-place
   plain new    [name]       Create a new Plain project
   plain init               Create a plain.json in the current directory
   plain install            Install dependencies listed in plain.json
@@ -42,6 +47,8 @@ Commands
 Examples:
   plain run hello.pln
   plain build app.pln
+  plain check app.pln
+  plain fmt app.pln
   plain new myapp
   plain init
   plain add express
@@ -399,6 +406,43 @@ function cmdUpdate() {
   }
 }
 
+// Check syntax of a Plain file without generating JavaScript or executing.
+function cmdCheck(filePath) {
+  if (!filePath) {
+    console.error('Usage: plain check <file.pln>');
+    process.exit(1);
+  }
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
+  try {
+    resolveDependencies(absPath);
+    console.log(`✓ ${filePath} — no errors found.`);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
+// Format a Plain file in-place.
+function cmdFmt(filePath) {
+  if (!filePath) {
+    console.error('Usage: plain fmt <file.pln>');
+    process.exit(1);
+  }
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
+  const source    = fs.readFileSync(absPath, 'utf8');
+  const formatted = format(source);
+  fs.writeFileSync(absPath, formatted, 'utf8');
+  console.log(`✓ Formatted ${filePath}`);
+}
+
 function cmdVersion() {
   console.log(`Plain v${VERSION}`);
 }
@@ -414,6 +458,8 @@ const [, , command, fileArg] = process.argv;
 switch (command) {
   case 'run':     cmdRun(fileArg);        break;
   case 'build':   cmdBuild(fileArg);      break;
+  case 'check':   cmdCheck(fileArg);      break;
+  case 'fmt':     cmdFmt(fileArg);        break;
   case 'new':     cmdNew(fileArg);        break;
   case 'init':    cmdInit();              break;
   case 'install': cmdInstall();           break;
