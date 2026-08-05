@@ -33,6 +33,14 @@ function closestKeyword(word) {
   return bestDist <= 2 ? best : null;
 }
 
+// Format an error message with position info from a token when available.
+function makeError(message, token) {
+  if (token && token.line) {
+    return `Line ${token.line}, Column ${token.col}: ${message}`;
+  }
+  return message;
+}
+
 function parse(tokens) {
   let pos = 0;
 
@@ -43,7 +51,10 @@ function parse(tokens) {
   function consume(expectedType, hint) {
     const token = tokens[pos];
     if (token.type !== expectedType) {
-      throw new Error(hint || `Expected ${expectedType} but got "${token.value || token.type}".`);
+      throw new Error(makeError(
+        hint || `Expected ${expectedType} but got "${token.value || token.type}".`,
+        token
+      ));
     }
     return advance();
   }
@@ -86,12 +97,18 @@ function parse(tokens) {
       const word = expr.type === 'Identifier' ? expr.name : token.value;
       const suggestion = closestKeyword(word);
       if (suggestion) {
-        throw new Error(`Unknown keyword "${word}". Did you mean "${suggestion}"?`);
+        throw new Error(makeError(
+          `Unknown keyword "${word}". Did you mean "${suggestion}"?`,
+          token
+        ));
       }
-      throw new Error(`Unexpected word "${word}". This is not a valid statement in Plain.`);
+      throw new Error(makeError(
+        `Unexpected word "${word}". This is not a valid statement in Plain.`,
+        token
+      ));
     }
 
-    throw new Error(`Unexpected keyword "${token.value}".`);
+    throw new Error(makeError(`Unexpected keyword "${token.value}".`, token));
   }
 
   // remember <name> as <value>
@@ -219,7 +236,10 @@ function parse(tokens) {
       const properties = [];
       while (peek().type !== TOKEN.DONE) {
         if (peek().type === TOKEN.EOF) {
-          throw new Error('Expected keyword "done" to close "reply json" block before end of file.');
+          throw new Error(makeError(
+            'Expected keyword "done" to close "reply json" block before end of file.',
+            peek()
+          ));
         }
         const key = consume(TOKEN.IDENTIFIER, 'Expected a property name.').value;
         consume(TOKEN.IS, `Expected "is" after property name "${key}".`);
@@ -252,7 +272,10 @@ function parse(tokens) {
     const consequent = [];
     while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.DONE) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected keyword "done" before end of file to close the "if" block.');
+        throw new Error(makeError(
+          'Expected keyword "done" before end of file to close the "if" block.',
+          peek()
+        ));
       }
       const stmt = parseStatement();
       if (stmt) consequent.push(stmt);
@@ -264,7 +287,10 @@ function parse(tokens) {
       alternate = [];
       while (peek().type !== TOKEN.DONE) {
         if (peek().type === TOKEN.EOF) {
-          throw new Error('Expected keyword "done" before end of file to close the "otherwise" block.');
+          throw new Error(makeError(
+            'Expected keyword "done" before end of file to close the "otherwise" block.',
+            peek()
+          ));
         }
         const stmt = parseStatement();
         if (stmt) alternate.push(stmt);
@@ -277,7 +303,11 @@ function parse(tokens) {
 
   // is | is greater than | is less than
   function parseComparison() {
-    consume(TOKEN.IS, 'Expected a comparison after the value. Use "is", "is greater than", or "is less than".');
+    const token = peek();
+    consume(TOKEN.IS, makeError(
+      'Expected a comparison after the value. Use "is", "is greater than", or "is less than".',
+      token
+    ));
     if (peek().type === TOKEN.GREATER) {
       advance();
       consume(TOKEN.THAN, 'Expected "than" after "greater". Use: is greater than');
@@ -297,7 +327,10 @@ function parse(tokens) {
     const body = [];
     while (peek().type !== TOKEN.DONE) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error(`Expected keyword "done" to close the ${context} before end of file.`);
+        throw new Error(makeError(
+          `Expected keyword "done" to close the ${context} before end of file.`,
+          peek()
+        ));
       }
       const stmt = parseStatement();
       if (stmt) body.push(stmt);
@@ -353,9 +386,10 @@ function parse(tokens) {
       return { type: 'Identifier', name: token.value };
     }
 
-    throw new Error(
-      `Expected a value (a word, number, string, or array) but got "${token.value || token.type}".`
-    );
+    throw new Error(makeError(
+      `Expected a value (a word, number, string, or array) but got "${token.value || token.type}".`,
+      token
+    ));
   }
 
   // [ expr, expr, ... ]
@@ -364,7 +398,7 @@ function parse(tokens) {
     const elements = [];
     while (peek().type !== TOKEN.RBRACKET) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected "]" to close the array before end of file.');
+        throw new Error(makeError('Expected "]" to close the array before end of file.', peek()));
       }
       elements.push(parseExpression());
       if (peek().type === TOKEN.COMMA) advance();
@@ -378,7 +412,10 @@ function parse(tokens) {
     const properties = [];
     while (peek().type !== TOKEN.DONE) {
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected keyword "done" to close the object literal before end of file.');
+        throw new Error(makeError(
+          'Expected keyword "done" to close the object literal before end of file.',
+          peek()
+        ));
       }
       const key = consume(TOKEN.IDENTIFIER, 'Expected a property name.').value;
       consume(TOKEN.IS, `Expected "is" after property name "${key}".\n\nExample:\n  name is "Ayokunle"`);
@@ -402,13 +439,13 @@ function parse(tokens) {
     const args = [];
     if (peek().type === TOKEN.RPAREN) return args;
     if (peek().type === TOKEN.EOF) {
-      throw new Error('Expected ")" to close the argument list before end of file.');
+      throw new Error(makeError('Expected ")" to close the argument list before end of file.', peek()));
     }
     args.push(parseExpression());
     while (peek().type === TOKEN.COMMA) {
       advance();
       if (peek().type === TOKEN.EOF) {
-        throw new Error('Expected ")" to close the argument list before end of file.');
+        throw new Error(makeError('Expected ")" to close the argument list before end of file.', peek()));
       }
       args.push(parseExpression());
     }

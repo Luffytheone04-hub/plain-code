@@ -1,4 +1,5 @@
 // Lexer: converts Plain source text into a stream of tokens.
+// Each token includes { type, value, line, col } for diagnostic reporting.
 
 const TOKEN = {
   // Core keywords
@@ -81,10 +82,18 @@ const KEYWORDS = {
 function tokenize(source) {
   const tokens = [];
   let i = 0;
+  let line = 1;
+  let lineStart = 0;
+
+  function col() { return i - lineStart + 1; }
 
   while (i < source.length) {
-    // Skip whitespace
-    if (/\s/.test(source[i])) { i++; continue; }
+    // Skip whitespace (track newlines for line counting)
+    if (/\s/.test(source[i])) {
+      if (source[i] === '\n') { line++; lineStart = i + 1; }
+      i++;
+      continue;
+    }
 
     // Single-line comment: skip to end of line
     if (source[i] === '/' && source[i + 1] === '/') {
@@ -92,16 +101,24 @@ function tokenize(source) {
       continue;
     }
 
+    const tokenLine = line;
+    const tokenCol  = col();
+
     // String literal
     if (source[i] === '"') {
       let str = '';
       i++; // skip opening quote
-      while (i < source.length && source[i] !== '"') str += source[i++];
+      while (i < source.length && source[i] !== '"') {
+        if (source[i] === '\n') { line++; lineStart = i + 1; }
+        str += source[i++];
+      }
       if (i >= source.length) {
-        throw new Error('Unterminated string: the closing " is missing.');
+        throw new Error(
+          `Line ${tokenLine}, Column ${tokenCol}: Unterminated string: the closing " is missing.`
+        );
       }
       i++; // skip closing quote
-      tokens.push({ type: TOKEN.STRING, value: str });
+      tokens.push({ type: TOKEN.STRING, value: str, line: tokenLine, col: tokenCol });
       continue;
     }
 
@@ -109,7 +126,7 @@ function tokenize(source) {
     if (/[0-9]/.test(source[i])) {
       let num = '';
       while (i < source.length && /[0-9.]/.test(source[i])) num += source[i++];
-      tokens.push({ type: TOKEN.NUMBER, value: Number(num) });
+      tokens.push({ type: TOKEN.NUMBER, value: Number(num), line: tokenLine, col: tokenCol });
       continue;
     }
 
@@ -118,25 +135,25 @@ function tokenize(source) {
       let word = '';
       while (i < source.length && /[a-zA-Z0-9_]/.test(source[i])) word += source[i++];
       const type = KEYWORDS[word] || TOKEN.IDENTIFIER;
-      tokens.push({ type, value: word });
+      tokens.push({ type, value: word, line: tokenLine, col: tokenCol });
       continue;
     }
 
     // Single-character punctuation
-    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(' }); i++; continue; }
-    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')' }); i++; continue; }
-    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[' }); i++; continue; }
-    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']' }); i++; continue; }
-    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',' }); i++; continue; }
-    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.' }); i++; continue; }
-    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+' }); i++; continue; }
+    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(', line, col: col() }); i++; continue; }
+    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')', line, col: col() }); i++; continue; }
+    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[', line, col: col() }); i++; continue; }
+    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']', line, col: col() }); i++; continue; }
+    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',', line, col: col() }); i++; continue; }
+    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line, col: col() }); i++; continue; }
+    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line, col: col() }); i++; continue; }
 
     throw new Error(
-      `Unexpected character "${source[i]}" at position ${i}. Plain only uses letters, numbers, strings, and known symbols.`
+      `Line ${line}, Column ${col()}: Unexpected character "${source[i]}". Plain only uses letters, numbers, strings, and known symbols.`
     );
   }
 
-  tokens.push({ type: TOKEN.EOF });
+  tokens.push({ type: TOKEN.EOF, line, col: col() });
   return tokens;
 }
 
