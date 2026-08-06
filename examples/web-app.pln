@@ -1,0 +1,20 @@
+// Plain v0.6 — Web App (Express shorthand)
+
+web app
+
+route "/"
+    reply "Hello from Plain v0.6!"
+done
+
+route "/about"
+    reply "About Plain"
+done
+
+route "/api/status"
+    reply json
+        status is "ok"
+        version is "0.6"
+    done
+done
+
+start 3000

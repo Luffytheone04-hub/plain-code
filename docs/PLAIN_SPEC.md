@@ -1,6 +1,6 @@
-# Plain Language Specification (v0.5.0)
+# Plain Language Specification (v0.6.0)
 
-Version: 0.5.0
+Version: 0.6.0
 Status: Draft
 File Extension: .pln
 

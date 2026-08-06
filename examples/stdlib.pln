@@ -1,0 +1,41 @@
+// Plain v0.6 — Standard Library Examples
+
+// print (alias for show, compiled to console.log)
+print("Hello from print!")
+
+// time and date
+remember now as time()
+remember today as date()
+show now
+show today
+
+// JSON encoding and decoding
+remember user as
+    name is "Ayokunle"
+    age is 17
+done
+
+remember encoded as jsonEncode(user)
+show encoded
+
+remember decoded as jsonDecode(encoded)
+show decoded
+
+// Environment variables
+remember nodeEnv as env("NODE_ENV")
+show nodeEnv
+
+// File operations
+writeFile("hello.txt", "Hello from Plain!")
+remember exists as fileExists("hello.txt")
+show exists
+
+remember content as readFile("hello.txt")
+show content
+
+// UUID
+remember id as uuid()
+show id
+
+// exit (commented out so this example can run fully)
+// exit(0)

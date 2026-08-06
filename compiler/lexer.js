@@ -2,53 +2,80 @@
 // Each token includes { type, value, line, col } for diagnostic reporting.
 
 const TOKEN = {
-  // Core keywords
-  REMEMBER:   'REMEMBER',
-  SHOW:       'SHOW',
-  AS:         'AS',
-  IF:         'IF',
-  OTHERWISE:  'OTHERWISE',
-  DONE:       'DONE',
-  IS:         'IS',
-  GREATER:    'GREATER',
-  LESS:       'LESS',
-  THAN:       'THAN',
-  MAKE:       'MAKE',
-  GIVE:       'GIVE',
-  BECOMES:    'BECOMES',
-  FOR:        'FOR',
-  EACH:       'EACH',
-  IN:         'IN',
-  WHILE:      'WHILE',
-  USE:        'USE',
-  IMPORT:     'IMPORT',
-  // v0.3 — runtime keywords
-  WHEN:       'WHEN',
-  SOMEONE:    'SOMEONE',
-  VISITS:     'VISITS',
-  LISTEN:     'LISTEN',
-  ON:         'ON',
-  REPLY:      'REPLY',
-  JSON_KW:    'JSON_KW',
-  SERVE:      'SERVE',
-  FOLDER:     'FOLDER',
+  // Core keywords (v0.1–v0.4)
+  REMEMBER:    'REMEMBER',
+  SHOW:        'SHOW',
+  AS:          'AS',
+  IF:          'IF',
+  OTHERWISE:   'OTHERWISE',
+  DONE:        'DONE',
+  IS:          'IS',
+  GREATER:     'GREATER',
+  LESS:        'LESS',
+  THAN:        'THAN',
+  MAKE:        'MAKE',
+  GIVE:        'GIVE',
+  BECOMES:     'BECOMES',
+  FOR:         'FOR',
+  EACH:        'EACH',   // also used for "every" alias
+  IN:          'IN',
+  WHILE:       'WHILE',
+  USE:         'USE',
+  IMPORT:      'IMPORT',
+  // v0.3 — Express runtime
+  WHEN:        'WHEN',
+  SOMEONE:     'SOMEONE',
+  VISITS:      'VISITS',
+  LISTEN:      'LISTEN',
+  ON:          'ON',
+  REPLY:       'REPLY',
+  JSON_KW:     'JSON_KW',
+  SERVE:       'SERVE',
+  FOLDER:      'FOLDER',
+  // v0.6 — Extended comparisons
+  ABOVE:       'ABOVE',
+  BELOW:       'BELOW',
+  AT:          'AT',
+  LEAST:       'LEAST',
+  MOST:        'MOST',
+  NOT:         'NOT',
+  EMPTY:       'EMPTY',
+  CONTAINS:    'CONTAINS',
+  STARTS:      'STARTS',
+  ENDS:        'ENDS',
+  WITH:        'WITH',
+  BETWEEN:     'BETWEEN',
+  AND:         'AND',
+  // v0.6 — Express DX
+  WEB:         'WEB',
+  ROUTE_KW:    'ROUTE_KW',
+  START_KW:    'START_KW',
+  // v0.6 — SQLite DX
+  DATABASE_KW: 'DATABASE_KW',
+  QUERY_KW:    'QUERY_KW',
+  INSERT_KW:   'INSERT_KW',
+  UPDATE_KW:   'UPDATE_KW',
+  DELETE_KW:   'DELETE_KW',
+  EXECUTE_KW:  'EXECUTE_KW',
+  SQL_BODY:    'SQL_BODY',   // raw SQL collected between a block keyword and "done"
   // Punctuation
-  LPAREN:     'LPAREN',
-  RPAREN:     'RPAREN',
-  LBRACKET:   'LBRACKET',
-  RBRACKET:   'RBRACKET',
-  COMMA:      'COMMA',
-  DOT:        'DOT',
-  PLUS:       'PLUS',
+  LPAREN:      'LPAREN',
+  RPAREN:      'RPAREN',
+  LBRACKET:    'LBRACKET',
+  RBRACKET:    'RBRACKET',
+  COMMA:       'COMMA',
+  DOT:         'DOT',
+  PLUS:        'PLUS',
   // Literals & identifiers
-  IDENTIFIER: 'IDENTIFIER',
-  STRING:     'STRING',
-  NUMBER:     'NUMBER',
+  IDENTIFIER:  'IDENTIFIER',
+  STRING:      'STRING',
+  NUMBER:      'NUMBER',
   // End of input
-  EOF:        'EOF',
+  EOF:         'EOF',
 };
 
 const KEYWORDS = {
+  // Core
   remember:  TOKEN.REMEMBER,
   show:      TOKEN.SHOW,
   as:        TOKEN.AS,
@@ -64,10 +91,12 @@ const KEYWORDS = {
   becomes:   TOKEN.BECOMES,
   for:       TOKEN.FOR,
   each:      TOKEN.EACH,
+  every:     TOKEN.EACH,    // alias: "for every" = "for each"
   in:        TOKEN.IN,
   while:     TOKEN.WHILE,
   use:       TOKEN.USE,
   import:    TOKEN.IMPORT,
+  // v0.3
   when:      TOKEN.WHEN,
   someone:   TOKEN.SOMEONE,
   visits:    TOKEN.VISITS,
@@ -77,6 +106,35 @@ const KEYWORDS = {
   json:      TOKEN.JSON_KW,
   serve:     TOKEN.SERVE,
   folder:    TOKEN.FOLDER,
+  // v0.6 — comparisons
+  above:     TOKEN.ABOVE,
+  below:     TOKEN.BELOW,
+  at:        TOKEN.AT,
+  least:     TOKEN.LEAST,
+  most:      TOKEN.MOST,
+  not:       TOKEN.NOT,
+  empty:     TOKEN.EMPTY,
+  contains:  TOKEN.CONTAINS,
+  starts:    TOKEN.STARTS,
+  ends:      TOKEN.ENDS,
+  with:      TOKEN.WITH,
+  between:   TOKEN.BETWEEN,
+  and:       TOKEN.AND,
+  // v0.6 — Express DX
+  web:       TOKEN.WEB,
+  route:     TOKEN.ROUTE_KW,
+  start:     TOKEN.START_KW,
+  // v0.6 — SQLite DX
+  database:  TOKEN.DATABASE_KW,
+};
+
+// Keywords that introduce raw SQL blocks (content up to "done" is collected verbatim).
+const SQL_BLOCK_WORDS = {
+  query:   TOKEN.QUERY_KW,
+  insert:  TOKEN.INSERT_KW,
+  update:  TOKEN.UPDATE_KW,
+  delete:  TOKEN.DELETE_KW,
+  execute: TOKEN.EXECUTE_KW,
 };
 
 function tokenize(source) {
@@ -130,23 +188,64 @@ function tokenize(source) {
       continue;
     }
 
-    // Word: keyword or identifier
+    // Word: keyword, SQL-block keyword, or identifier
     if (/[a-zA-Z_]/.test(source[i])) {
       let word = '';
       while (i < source.length && /[a-zA-Z0-9_]/.test(source[i])) word += source[i++];
+
+      // SQL block keywords: collect raw content up to "done"
+      if (SQL_BLOCK_WORDS[word]) {
+        const kwType = SQL_BLOCK_WORDS[word];
+        tokens.push({ type: kwType, value: word, line: tokenLine, col: tokenCol });
+
+        // Check if the rest of this line is blank (raw block mode)
+        let j = i;
+        while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
+
+        if (j >= source.length || source[j] === '\n' || source[j] === '\r') {
+          // Advance past the newline
+          i = j;
+          if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
+
+          // Collect raw lines until a line whose trimmed content is exactly "done"
+          let sql = '';
+          while (i < source.length) {
+            const lineEnd  = source.indexOf('\n', i);
+            const realEnd  = lineEnd === -1 ? source.length : lineEnd;
+            const lineText = source.slice(i, realEnd);
+            const trimmed  = lineText.trim();
+
+            if (trimmed === 'done') {
+              i = realEnd < source.length ? realEnd + 1 : realEnd;
+              if (realEnd < source.length) { line++; lineStart = i; }
+              break;
+            }
+
+            sql += lineText + '\n';
+            i = realEnd < source.length ? realEnd + 1 : realEnd;
+            if (realEnd < source.length) { line++; lineStart = i; }
+          }
+
+          tokens.push({ type: TOKEN.SQL_BODY,  value: sql.trimEnd(), line: tokenLine, col: tokenCol });
+          tokens.push({ type: TOKEN.DONE,       value: 'done',         line, col: col() });
+        }
+        // else: stays on same line — parsed normally by the parser as kwType + next tokens
+        continue;
+      }
+
       const type = KEYWORDS[word] || TOKEN.IDENTIFIER;
       tokens.push({ type, value: word, line: tokenLine, col: tokenCol });
       continue;
     }
 
     // Single-character punctuation
-    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(', line, col: col() }); i++; continue; }
-    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')', line, col: col() }); i++; continue; }
-    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[', line, col: col() }); i++; continue; }
-    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']', line, col: col() }); i++; continue; }
-    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',', line, col: col() }); i++; continue; }
-    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line, col: col() }); i++; continue; }
-    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line, col: col() }); i++; continue; }
+    if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === ']') { tokens.push({ type: TOKEN.RBRACKET, value: ']', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === ',') { tokens.push({ type: TOKEN.COMMA,    value: ',', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '.') { tokens.push({ type: TOKEN.DOT,      value: '.', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '+') { tokens.push({ type: TOKEN.PLUS,     value: '+', line: tokenLine, col: tokenCol }); i++; continue; }
 
     throw new Error(
       `Line ${line}, Column ${col()}: Unexpected character "${source[i]}". Plain only uses letters, numbers, strings, and known symbols.`

@@ -6,6 +6,7 @@ const { TOKEN } = require('./lexer');
 const STATEMENT_KEYWORDS = [
   'remember', 'show', 'if', 'make', 'give',
   'for', 'while', 'use', 'import', 'when', 'listen', 'reply', 'serve',
+  'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
 ];
 
 // Returns the Levenshtein edit distance between two strings.
@@ -59,24 +60,149 @@ function parse(tokens) {
     return advance();
   }
 
+  // ── Condition parsing ───────────────────────────────────────────────────────
+  //
+  // Returns a condition node (used by if and while):
+  //   BinaryCondition  { type, left, op, right }      — left op right
+  //   UnaryCondition   { type, left, op }              — left is empty / is not empty
+  //   BetweenCondition { type, left, low, high }       — left between low and high
+  //   StringCondition  { type, left, method, right }   — left contains/startsWith/endsWith right
+
+  function parseCondition() {
+    const left = parseExpression();
+
+    // ── Non-"is" operators ──────────────────────────────────────────────────
+    if (peek().type === TOKEN.CONTAINS) {
+      advance();
+      const right = parseExpression();
+      return { type: 'StringCondition', left, method: 'includes', right };
+    }
+
+    if (peek().type === TOKEN.STARTS) {
+      advance();
+      consume(TOKEN.WITH, makeError('Expected "with" after "starts". Use: starts with', peek()));
+      const right = parseExpression();
+      return { type: 'StringCondition', left, method: 'startsWith', right };
+    }
+
+    if (peek().type === TOKEN.ENDS) {
+      advance();
+      consume(TOKEN.WITH, makeError('Expected "with" after "ends". Use: ends with', peek()));
+      const right = parseExpression();
+      return { type: 'StringCondition', left, method: 'endsWith', right };
+    }
+
+    if (peek().type === TOKEN.BETWEEN) {
+      advance();
+      const low = parseExpression();
+      consume(TOKEN.AND, makeError('Expected "and" after the lower bound in "between" expression.\n\nExample:\n  if x between 1 and 10', peek()));
+      const high = parseExpression();
+      return { type: 'BetweenCondition', left, low, high };
+    }
+
+    // ── "is ..." comparisons ────────────────────────────────────────────────
+    const isToken = peek();
+    consume(TOKEN.IS, makeError(
+      'Expected a comparison after the value. Use "is", "is above", "is below", "contains", "starts with", etc.',
+      isToken
+    ));
+
+    // is not empty / is not <expr>
+    if (peek().type === TOKEN.NOT) {
+      advance();
+      if (peek().type === TOKEN.EMPTY) {
+        advance();
+        return { type: 'UnaryCondition', left, op: 'isNotEmpty' };
+      }
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '!==', right };
+    }
+
+    // is empty
+    if (peek().type === TOKEN.EMPTY) {
+      advance();
+      return { type: 'UnaryCondition', left, op: 'isEmpty' };
+    }
+
+    // is above  (alias: >)
+    if (peek().type === TOKEN.ABOVE) {
+      advance();
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '>', right };
+    }
+
+    // is below  (alias: <)
+    if (peek().type === TOKEN.BELOW) {
+      advance();
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '<', right };
+    }
+
+    // is at least  (>=) / is at most  (<=)
+    if (peek().type === TOKEN.AT) {
+      advance();
+      if (peek().type === TOKEN.LEAST) {
+        advance();
+        const right = parseExpression();
+        return { type: 'BinaryCondition', left, op: '>=', right };
+      }
+      if (peek().type === TOKEN.MOST) {
+        advance();
+        const right = parseExpression();
+        return { type: 'BinaryCondition', left, op: '<=', right };
+      }
+      throw new Error(makeError('Expected "least" or "most" after "at". Use: is at least / is at most', peek()));
+    }
+
+    // is greater than
+    if (peek().type === TOKEN.GREATER) {
+      advance();
+      consume(TOKEN.THAN, 'Expected "than" after "greater". Use: is greater than');
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '>', right };
+    }
+
+    // is less than
+    if (peek().type === TOKEN.LESS) {
+      advance();
+      consume(TOKEN.THAN, 'Expected "than" after "less". Use: is less than');
+      const right = parseExpression();
+      return { type: 'BinaryCondition', left, op: '<', right };
+    }
+
+    // is <expr>  (equality)
+    const right = parseExpression();
+    return { type: 'BinaryCondition', left, op: '===', right };
+  }
+
   // ── Statements ─────────────────────────────────────────────────────────────
 
   function parseStatement() {
     const token = peek();
 
-    if (token.type === TOKEN.REMEMBER) return parseRemember();
-    if (token.type === TOKEN.SHOW)     return parseShow();
-    if (token.type === TOKEN.IF)       return parseIf();
-    if (token.type === TOKEN.MAKE)     return parseMake();
-    if (token.type === TOKEN.GIVE)     return parseGive();
-    if (token.type === TOKEN.FOR)      return parseForEach();
-    if (token.type === TOKEN.WHILE)    return parseWhile();
-    if (token.type === TOKEN.USE)      return parseUse();
-    if (token.type === TOKEN.IMPORT)   return parseImport();
-    if (token.type === TOKEN.WHEN)     return parseRoute();
-    if (token.type === TOKEN.LISTEN)   return parseListen();
-    if (token.type === TOKEN.REPLY)    return parseReply();
-    if (token.type === TOKEN.SERVE)    return parseServeFolder();
+    if (token.type === TOKEN.REMEMBER)    return parseRemember();
+    if (token.type === TOKEN.SHOW)        return parseShow();
+    if (token.type === TOKEN.IF)          return parseIf();
+    if (token.type === TOKEN.MAKE)        return parseMake();
+    if (token.type === TOKEN.GIVE)        return parseGive();
+    if (token.type === TOKEN.FOR)         return parseForEach();
+    if (token.type === TOKEN.WHILE)       return parseWhile();
+    if (token.type === TOKEN.USE)         return parseUse();
+    if (token.type === TOKEN.IMPORT)      return parseImport();
+    if (token.type === TOKEN.WHEN)        return parseRoute();
+    if (token.type === TOKEN.LISTEN)      return parseListen();
+    if (token.type === TOKEN.REPLY)       return parseReply();
+    if (token.type === TOKEN.SERVE)       return parseServeFolder();
+    // v0.6
+    if (token.type === TOKEN.WEB)         return parseWebApp();
+    if (token.type === TOKEN.ROUTE_KW)    return parseSimpleRoute();
+    if (token.type === TOKEN.START_KW)    return parseStart();
+    if (token.type === TOKEN.DATABASE_KW) return parseDatabase();
+    if (token.type === TOKEN.QUERY_KW)    return parseSqlBlock('query',   'QueryStatement');
+    if (token.type === TOKEN.INSERT_KW)   return parseSqlBlock('insert',  'InsertStatement');
+    if (token.type === TOKEN.UPDATE_KW)   return parseSqlBlock('update',  'UpdateStatement');
+    if (token.type === TOKEN.DELETE_KW)   return parseSqlBlock('delete',  'DeleteStatement');
+    if (token.type === TOKEN.EXECUTE_KW)  return parseSqlBlock('execute', 'ExecuteStatement');
 
     if (token.type === TOKEN.EOF) return null;
 
@@ -171,24 +297,24 @@ function parse(tokens) {
   }
 
   // for each <item> in <collection> ... done
+  // for every <item> in <collection> ... done  (alias — "every" maps to EACH token)
   function parseForEach() {
     consume(TOKEN.FOR);
-    consume(TOKEN.EACH, 'Expected "each" after "for".\n\nExample:\n  for each item in players\n    show item\n  done');
-    const item = consume(TOKEN.IDENTIFIER, 'Expected an item name after "each".').value;
+    consume(TOKEN.EACH,
+      'Expected "each" or "every" after "for".\n\nExample:\n  for each item in players\n    show item\n  done');
+    const item = consume(TOKEN.IDENTIFIER, 'Expected an item name after "each" or "every".').value;
     consume(TOKEN.IN, `Expected "in" after "${item}".\n\nExample:\n  for each item in players`);
     const collection = parseExpression();
     const body = parseBody('"for each" loop');
     return { type: 'ForEachStatement', item, collection, body };
   }
 
-  // while <left> <comparison> <right> ... done
+  // while <condition> ... done
   function parseWhile() {
     consume(TOKEN.WHILE);
-    const left     = parseExpression();
-    const operator = parseComparison();
-    const right    = parseExpression();
-    const body     = parseBody('"while" loop');
-    return { type: 'WhileStatement', left, operator, right, body };
+    const condition = parseCondition();
+    const body      = parseBody('"while" loop');
+    return { type: 'WhileStatement', condition, body };
   }
 
   // import "./file.pln"
@@ -204,16 +330,20 @@ function parse(tokens) {
   // use <module>
   function parseUse() {
     consume(TOKEN.USE);
-    const module = consume(TOKEN.IDENTIFIER, 'Expected a module name after "use".\n\nExample:\n  use express').value;
+    const module = consume(TOKEN.IDENTIFIER,
+      'Expected a module name after "use".\n\nExample:\n  use express').value;
     return { type: 'UseStatement', module };
   }
 
   // when someone visits "<path>" ... done
   function parseRoute() {
     consume(TOKEN.WHEN);
-    consume(TOKEN.SOMEONE, 'Expected "someone" after "when".\n\nExample:\n  when someone visits "/"\n    reply "Hello"\n  done');
-    consume(TOKEN.VISITS,  'Expected "visits" after "someone".\n\nExample:\n  when someone visits "/"');
-    const routePath = consume(TOKEN.STRING, 'Expected a route path string after "visits".\n\nExample:\n  when someone visits "/"').value;
+    consume(TOKEN.SOMEONE,
+      'Expected "someone" after "when".\n\nExample:\n  when someone visits "/"\n    reply "Hello"\n  done');
+    consume(TOKEN.VISITS,
+      'Expected "visits" after "someone".\n\nExample:\n  when someone visits "/"');
+    const routePath = consume(TOKEN.STRING,
+      'Expected a route path string after "visits".\n\nExample:\n  when someone visits "/"').value;
     const body = parseBody('route');
     return { type: 'RouteStatement', path: routePath, body };
   }
@@ -221,7 +351,8 @@ function parse(tokens) {
   // listen on <port> ... done
   function parseListen() {
     consume(TOKEN.LISTEN);
-    consume(TOKEN.ON, 'Expected "on" after "listen".\n\nExample:\n  listen on 3000\n    show "Running"\n  done');
+    consume(TOKEN.ON,
+      'Expected "on" after "listen".\n\nExample:\n  listen on 3000\n    show "Running"\n  done');
     const port = parseExpression();
     const body = parseBody('"listen" block');
     return { type: 'ListenStatement', port, body };
@@ -256,18 +387,74 @@ function parse(tokens) {
   // serve folder "<path>"
   function parseServeFolder() {
     consume(TOKEN.SERVE);
-    consume(TOKEN.FOLDER, 'Expected "folder" after "serve".\n\nExample:\n  serve folder "public"');
-    const folder = consume(TOKEN.STRING, 'Expected a folder path string after "serve folder".\n\nExample:\n  serve folder "public"').value;
+    consume(TOKEN.FOLDER,
+      'Expected "folder" after "serve".\n\nExample:\n  serve folder "public"');
+    const folder = consume(TOKEN.STRING,
+      'Expected a folder path string after "serve folder".\n\nExample:\n  serve folder "public"').value;
     return { type: 'ServeFolderStatement', folder };
+  }
+
+  // ── v0.6 — Express DX ──────────────────────────────────────────────────────
+
+  // web app
+  function parseWebApp() {
+    consume(TOKEN.WEB);
+    const appToken = peek();
+    if (appToken.type !== TOKEN.IDENTIFIER || appToken.value !== 'app') {
+      throw new Error(makeError(
+        'Expected "app" after "web".\n\nExample:\n  web app', appToken
+      ));
+    }
+    advance(); // consume "app"
+    return { type: 'WebAppStatement' };
+  }
+
+  // route "<path>" ... done
+  function parseSimpleRoute() {
+    consume(TOKEN.ROUTE_KW);
+    const routePath = consume(TOKEN.STRING,
+      'Expected a route path after "route".\n\nExample:\n  route "/"\n    reply "Hello"\n  done').value;
+    const body = parseBody('route');
+    return { type: 'SimpleRouteStatement', path: routePath, body };
+  }
+
+  // start <port>
+  function parseStart() {
+    consume(TOKEN.START_KW);
+    const port = parseExpression();
+    return { type: 'StartStatement', port };
+  }
+
+  // ── v0.6 — SQLite DX ───────────────────────────────────────────────────────
+
+  // database "<file>"
+  function parseDatabase() {
+    consume(TOKEN.DATABASE_KW);
+    const file = consume(TOKEN.STRING,
+      'Expected a database file path after "database".\n\nExample:\n  database "app.db"').value;
+    return { type: 'DatabaseStatement', file };
+  }
+
+  // query/insert/update/delete/execute SQL_BODY DONE
+  function parseSqlBlock(keyword, nodeType) {
+    advance(); // consume the keyword token (QUERY_KW, INSERT_KW, etc.)
+    const sqlToken = peek();
+    if (sqlToken.type !== TOKEN.SQL_BODY) {
+      throw new Error(makeError(
+        `Expected a SQL block after "${keyword}".\n\nExample:\n  ${keyword}\n      SELECT * FROM users\n  done`,
+        sqlToken
+      ));
+    }
+    const sql = advance().value; // consume SQL_BODY
+    consume(TOKEN.DONE, `Expected "done" to close the "${keyword}" block.`);
+    return { type: nodeType, sql };
   }
 
   // ── Conditions ─────────────────────────────────────────────────────────────
 
   function parseIf() {
     consume(TOKEN.IF);
-    const left     = parseExpression();
-    const operator = parseComparison();
-    const right    = parseExpression();
+    const condition = parseCondition();
 
     const consequent = [];
     while (peek().type !== TOKEN.OTHERWISE && peek().type !== TOKEN.DONE) {
@@ -298,27 +485,7 @@ function parse(tokens) {
     }
 
     advance(); // consume DONE
-    return { type: 'IfStatement', left, operator, right, consequent, alternate };
-  }
-
-  // is | is greater than | is less than
-  function parseComparison() {
-    const token = peek();
-    consume(TOKEN.IS, makeError(
-      'Expected a comparison after the value. Use "is", "is greater than", or "is less than".',
-      token
-    ));
-    if (peek().type === TOKEN.GREATER) {
-      advance();
-      consume(TOKEN.THAN, 'Expected "than" after "greater". Use: is greater than');
-      return '>';
-    }
-    if (peek().type === TOKEN.LESS) {
-      advance();
-      consume(TOKEN.THAN, 'Expected "than" after "less". Use: is less than');
-      return '<';
-    }
-    return '===';
+    return { type: 'IfStatement', condition, consequent, alternate };
   }
 
   // ── Shared helpers ──────────────────────────────────────────────────────────

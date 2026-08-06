@@ -17,12 +17,18 @@ const INDENT_STARTERS = [
   /^make\s+\S+\s*\(/,          // make name(...)
   /^if\s+/,                    // if ...
   /^otherwise\b/,              // otherwise
-  /^for\s+each\s+/,            // for each ...
+  /^for\s+(each|every)\s+/,   // for each ... / for every ...
   /^while\s+/,                 // while ...
   /^when\s+someone\s+visits/,  // when someone visits ...
   /^listen\s+on\s+/,           // listen on ...
   /^reply\s+json\b/,           // reply json
   /^remember\s+\S+\s+as\s*$/,  // remember x as   (object literal, ends with "as")
+  /^route\s+"/,                // route "..."       (v0.6 Express DX)
+  /^query\b/,                  // query SQL block   (v0.6 SQLite DX)
+  /^insert\b/,                 // insert SQL block
+  /^update\b/,                 // update SQL block
+  /^delete\b/,                 // delete SQL block
+  /^execute\b/,                // execute SQL block
 ];
 
 function opensBlock(line) {

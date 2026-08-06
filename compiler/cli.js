@@ -24,7 +24,22 @@ const { generate } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
+
+// ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
+
+const HAS_COLOR = Boolean(process.stdout.isTTY);
+function _c(code, text) { return HAS_COLOR ? `\x1b[${code}m${text}\x1b[0m` : text; }
+const clrGreen  = (t) => _c('32', t);
+const clrRed    = (t) => _c('31', t);
+const clrYellow = (t) => _c('33', t);
+const clrCyan   = (t) => _c('36', t);
+const clrBold   = (t) => _c('1',  t);
+const clrDim    = (t) => _c('2',  t);
+
+function warn(message) {
+  console.warn(clrYellow(`⚠  Warning: ${message}`));
+}
 
 const HELP = `
 Plain v${VERSION} — Intent-Oriented Programming Language
@@ -43,6 +58,15 @@ Commands
   plain update             Update all installed npm packages
   plain version            Print the compiler version
   plain help               Print this help text
+
+v0.6 Language Features
+
+  New comparisons: is above, is below, is at least, is at most,
+                   is not, is empty, is not empty, contains,
+                   starts with, ends with, between … and
+  Alias:           for every … in …  (same as for each)
+  Web shorthand:   web app / route "…" … done / start <port>
+  Database:        database "…" / query … done / insert … done
 
 Examples:
   plain run hello.pln
@@ -85,12 +109,14 @@ function writePlainJson(data) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function stage(label, fn) {
+  const t0 = Date.now();
   try {
     const result = fn();
-    console.log(`✓ ${label}`);
+    const ms = Date.now() - t0;
+    console.log(`${clrGreen('✓')} ${label}${ms > 50 ? clrDim(` (${ms}ms)`) : ''}`);
     return result;
   } catch (err) {
-    console.error(`✗ ${label} failed\n`);
+    console.error(`${clrRed('✗')} ${label} failed\n`);
     console.error(err.message);
     process.exit(1);
   }
@@ -417,9 +443,11 @@ function cmdCheck(filePath) {
     console.error(`File not found: ${filePath}`);
     process.exit(1);
   }
+  const t0 = Date.now();
   try {
     resolveDependencies(absPath);
-    console.log(`✓ ${filePath} — no errors found.`);
+    const ms = Date.now() - t0;
+    console.log(`${clrGreen('✓')} ${filePath} — no errors found.${clrDim(` (${ms}ms)`)}`);
   } catch (err) {
     console.error(err.message);
     process.exit(1);
@@ -439,12 +467,22 @@ function cmdFmt(filePath) {
   }
   const source    = fs.readFileSync(absPath, 'utf8');
   const formatted = format(source);
-  fs.writeFileSync(absPath, formatted, 'utf8');
-  console.log(`✓ Formatted ${filePath}`);
+  if (source === formatted) {
+    console.log(`${clrDim('–')} ${filePath} — already formatted.`);
+  } else {
+    fs.writeFileSync(absPath, formatted, 'utf8');
+    console.log(`${clrGreen('✓')} Formatted ${filePath}`);
+  }
 }
 
 function cmdVersion() {
   console.log(`Plain v${VERSION}`);
+}
+
+// eslint-disable-next-line no-unused-vars
+function cmdWarn_example() {
+  // Example of using the warn helper — not a real command
+  warn('This is how warnings look.');
 }
 
 function cmdHelp() {

@@ -1065,9 +1065,9 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 0.5.0', () => {
+test('plain version shows 0.6.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.5.0')) throw new Error(`Expected version 0.5.0 but got: ${out}`);
+  if (!out.includes('0.6.0')) throw new Error(`Expected version 0.6.0 but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
@@ -1335,9 +1335,379 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 0.5.0', () => {
+test('plain version shows 0.6.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.5.0')) throw new Error(`Expected version 0.5.0 but got: ${out}`);
+  if (!out.includes('0.6.0')) throw new Error(`Expected version 0.6.0 but got: ${out}`);
+});
+
+// ── v0.6 — Extended comparisons ──────────────────────────────────────────────
+
+console.log('\nv0.6 — Extended comparisons (lexer)');
+
+test('tokenizes "above" keyword', () => {
+  const tokens = tokenize('is above');
+  if (tokens[1].type !== TOKEN.ABOVE) throw new Error('above wrong');
+});
+
+test('tokenizes "below" keyword', () => {
+  const tokens = tokenize('is below');
+  if (tokens[1].type !== TOKEN.BELOW) throw new Error('below wrong');
+});
+
+test('tokenizes "between" keyword', () => {
+  const tokens = tokenize('between');
+  if (tokens[0].type !== TOKEN.BETWEEN) throw new Error('between wrong');
+});
+
+test('tokenizes "and" keyword', () => {
+  const tokens = tokenize('and');
+  if (tokens[0].type !== TOKEN.AND) throw new Error('and wrong');
+});
+
+test('tokenizes "contains" keyword', () => {
+  const tokens = tokenize('contains');
+  if (tokens[0].type !== TOKEN.CONTAINS) throw new Error('contains wrong');
+});
+
+test('tokenizes "every" as EACH token', () => {
+  const tokens = tokenize('every');
+  if (tokens[0].type !== TOKEN.EACH) throw new Error('every should be EACH token');
+});
+
+test('tokenizes "not" keyword', () => {
+  const tokens = tokenize('not');
+  if (tokens[0].type !== TOKEN.NOT) throw new Error('not wrong');
+});
+
+test('tokenizes "empty" keyword', () => {
+  const tokens = tokenize('empty');
+  if (tokens[0].type !== TOKEN.EMPTY) throw new Error('empty wrong');
+});
+
+console.log('\nv0.6 — Extended comparisons (compiler)');
+
+test('"is above" compiles to >', () => {
+  const src = 'remember age as 20\nif age is above 18\n  show "adult"\ndone';
+  const js = compile(src);
+  if (!js.includes('age > 18')) throw new Error('expected age > 18');
+});
+
+test('"is below" compiles to <', () => {
+  const src = 'remember age as 5\nif age is below 13\n  show "child"\ndone';
+  const js = compile(src);
+  if (!js.includes('age < 13')) throw new Error('expected age < 13');
+});
+
+test('"is at least" compiles to >=', () => {
+  const src = 'remember age as 18\nif age is at least 18\n  show "ok"\ndone';
+  const js = compile(src);
+  if (!js.includes('age >= 18')) throw new Error('expected age >= 18');
+});
+
+test('"is at most" compiles to <=', () => {
+  const src = 'remember x as 5\nif x is at most 10\n  show "ok"\ndone';
+  const js = compile(src);
+  if (!js.includes('x <= 10')) throw new Error('expected x <= 10');
+});
+
+test('"is not" compiles to !==', () => {
+  const src = 'remember x as 5\nif x is not 3\n  show "different"\ndone';
+  const js = compile(src);
+  if (!js.includes('x !== 3')) throw new Error('expected x !== 3');
+});
+
+test('"is empty" compiles to .length === 0', () => {
+  const src = 'if x is empty\n  show "empty"\ndone';
+  const js = compile(src);
+  if (!js.includes('(x).length === 0')) throw new Error('expected .length === 0');
+});
+
+test('"is not empty" compiles to .length > 0', () => {
+  const src = 'if x is not empty\n  show "has content"\ndone';
+  const js = compile(src);
+  if (!js.includes('(x).length > 0')) throw new Error('expected .length > 0');
+});
+
+test('"contains" compiles to .includes()', () => {
+  const src = 'if name contains "Plain"\n  show "yes"\ndone';
+  const js = compile(src);
+  if (!js.includes('.includes(')) throw new Error('expected .includes()');
+  if (!js.includes('"Plain"')) throw new Error('expected search value');
+});
+
+test('"starts with" compiles to .startsWith()', () => {
+  const src = 'if name starts with "Hello"\n  show "yes"\ndone';
+  const js = compile(src);
+  if (!js.includes('.startsWith(')) throw new Error('expected .startsWith()');
+});
+
+test('"ends with" compiles to .endsWith()', () => {
+  const src = 'if name ends with "!"\n  show "yes"\ndone';
+  const js = compile(src);
+  if (!js.includes('.endsWith(')) throw new Error('expected .endsWith()');
+});
+
+test('"between X and Y" compiles to >= X && <= Y', () => {
+  const src = 'if age between 13 and 19\n  show "teenager"\ndone';
+  const js = compile(src);
+  if (!js.includes('age >= 13 && age <= 19')) throw new Error('expected between condition');
+});
+
+test('"between" wraps in if (...) correctly', () => {
+  const src = 'if age between 1 and 100\n  show "alive"\ndone';
+  const js = compile(src);
+  if (!js.includes('if (age >= 1 && age <= 100)')) throw new Error('expected wrapped between');
+});
+
+test('"for every" compiles like "for each"', () => {
+  const src = 'for every item in players\n  show item\ndone';
+  const js = compile(src);
+  if (!js.includes('for (const item of players)')) throw new Error('missing for-of from for every');
+});
+
+test('"for every" end-to-end with array', () => {
+  const src = 'remember players as ["a", "b"]\nfor every player in players\n  show player\ndone';
+  const js = compile(src);
+  if (!js.includes('for (const player of players)')) throw new Error('missing for-of');
+  if (!js.includes('console.log(player)')) throw new Error('missing body');
+});
+
+test('"is above" works in while loop', () => {
+  const src = 'remember x as 10\nwhile x is above 0\n  x becomes x + 1\ndone';
+  const js = compile(src);
+  if (!js.includes('while (x > 0)')) throw new Error('expected while (x > 0)');
+});
+
+test('error: "is at" without least/most gives helpful message', () => {
+  try {
+    compile('if x is at 5\n  show "ok"\ndone');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('least') && !e.message.toLowerCase().includes('most')) {
+      throw new Error(`Expected "least" or "most" in error but got: ${e.message}`);
+    }
+  }
+});
+
+// ── v0.6 — Runtime Standard Library ──────────────────────────────────────────
+
+console.log('\nv0.6 — Runtime stdlib');
+
+test('print() compiles to console.log', () => {
+  const js = compile('print("hello")');
+  if (!js.includes('console.log("hello")')) throw new Error('missing console.log');
+});
+
+test('print() with multiple args compiles correctly', () => {
+  const js = compile('print("a")');
+  if (!js.includes('console.log(')) throw new Error('missing console.log call');
+});
+
+test('readFile() compiles to readFileSync', () => {
+  const js = compile('remember content as readFile("file.txt")');
+  if (!js.includes('readFileSync')) throw new Error('missing readFileSync');
+  if (!js.includes('"file.txt"')) throw new Error('missing filename');
+});
+
+test('writeFile() compiles to writeFileSync', () => {
+  const js = compile('writeFile("out.txt", "hello")');
+  if (!js.includes('writeFileSync')) throw new Error('missing writeFileSync');
+});
+
+test('fileExists() compiles to existsSync', () => {
+  const js = compile('remember exists as fileExists("file.txt")');
+  if (!js.includes('existsSync')) throw new Error('missing existsSync');
+});
+
+test('sleep() compiles to Atomics.wait', () => {
+  const js = compile('sleep(1000)');
+  if (!js.includes('Atomics.wait')) throw new Error('missing Atomics.wait');
+  if (!js.includes('1000')) throw new Error('missing duration');
+});
+
+test('time() compiles to Date.now()', () => {
+  const js = compile('remember t as time()');
+  if (!js.includes('Date.now()')) throw new Error('missing Date.now()');
+});
+
+test('date() compiles to new Date().toISOString()', () => {
+  const js = compile('remember d as date()');
+  if (!js.includes('new Date().toISOString()')) throw new Error('missing toISOString');
+});
+
+test('jsonEncode() compiles to JSON.stringify', () => {
+  const js = compile('remember s as jsonEncode(x)');
+  if (!js.includes('JSON.stringify(x)')) throw new Error('missing JSON.stringify');
+});
+
+test('jsonDecode() compiles to JSON.parse', () => {
+  const js = compile('remember obj as jsonDecode(s)');
+  if (!js.includes('JSON.parse(s)')) throw new Error('missing JSON.parse');
+});
+
+test('env() compiles to process.env', () => {
+  const js = compile('remember val as env("KEY")');
+  if (!js.includes('process.env[')) throw new Error('missing process.env');
+  if (!js.includes('"KEY"')) throw new Error('missing env key');
+});
+
+test('exit() compiles to process.exit', () => {
+  const js = compile('exit(0)');
+  if (!js.includes('process.exit(0)')) throw new Error('missing process.exit(0)');
+});
+
+test('uuid() compiles to randomUUID', () => {
+  const js = compile('remember id as uuid()');
+  if (!js.includes('randomUUID()')) throw new Error('missing randomUUID');
+});
+
+test('uuid() uses require("crypto")', () => {
+  const js = compile('remember id as uuid()');
+  if (!js.includes("require('crypto')")) throw new Error('missing require crypto');
+});
+
+// ── v0.6 — Express DX ────────────────────────────────────────────────────────
+
+console.log('\nv0.6 — Express DX');
+
+test('tokenizes "web" as WEB', () => {
+  const tokens = tokenize('web');
+  if (tokens[0].type !== TOKEN.WEB) throw new Error('web wrong');
+});
+
+test('tokenizes "route" as ROUTE_KW', () => {
+  const tokens = tokenize('route');
+  if (tokens[0].type !== TOKEN.ROUTE_KW) throw new Error('route wrong');
+});
+
+test('tokenizes "start" as START_KW', () => {
+  const tokens = tokenize('start');
+  if (tokens[0].type !== TOKEN.START_KW) throw new Error('start wrong');
+});
+
+test('"web app" compiles to Express require and app setup', () => {
+  const js = compile('web app');
+  if (!js.includes("require('express')")) throw new Error('missing require express');
+  if (!js.includes('const app = express()')) throw new Error('missing const app');
+});
+
+test('"web app" generates const express', () => {
+  const js = compile('web app');
+  if (!js.includes('const express')) throw new Error('missing const express');
+});
+
+test('"route" shorthand compiles to app.get', () => {
+  const src = 'route "/"\n  reply "Hello"\ndone';
+  const js = compile(src);
+  if (!js.includes('app.get("/",')) throw new Error('missing app.get');
+  if (!js.includes('(req, res) =>')) throw new Error('missing callback');
+});
+
+test('"route" reply compiles to res.send', () => {
+  const src = 'route "/home"\n  reply "Home"\ndone';
+  const js = compile(src);
+  if (!js.includes('res.send("Home")')) throw new Error('missing res.send');
+});
+
+test('"start" compiles to app.listen without body', () => {
+  const src = 'start 3000';
+  const js = compile(src);
+  if (!js.includes('app.listen(3000)')) throw new Error('missing app.listen(3000)');
+  if (js.includes('() =>')) throw new Error('start should not have callback');
+});
+
+test('"start" works with a variable port', () => {
+  const src = 'remember port as 8080\nstart port';
+  const js = compile(src);
+  if (!js.includes('app.listen(port)')) throw new Error('missing app.listen(port)');
+});
+
+// ── v0.6 — SQLite DX ─────────────────────────────────────────────────────────
+
+console.log('\nv0.6 — SQLite DX');
+
+test('tokenizes "database" as DATABASE_KW', () => {
+  const tokens = tokenize('database');
+  if (tokens[0].type !== TOKEN.DATABASE_KW) throw new Error('database wrong');
+});
+
+test('tokenizes "query" block as QUERY_KW + SQL_BODY + DONE', () => {
+  const tokens = tokenize('query\n    SELECT * FROM users\ndone');
+  if (tokens[0].type !== TOKEN.QUERY_KW)  throw new Error('QUERY_KW wrong');
+  if (tokens[1].type !== TOKEN.SQL_BODY)  throw new Error('SQL_BODY wrong');
+  if (tokens[2].type !== TOKEN.DONE)      throw new Error('DONE wrong');
+});
+
+test('"query" SQL_BODY contains the SQL text', () => {
+  const tokens = tokenize('query\n    SELECT 1\ndone');
+  if (!tokens[1].value.includes('SELECT 1')) throw new Error('SQL content missing');
+});
+
+test('"database" compiles to new Database()', () => {
+  const js = compile('database "app.db"');
+  if (!js.includes('new Database("app.db")')) throw new Error('missing new Database');
+});
+
+test('"database" generates require better-sqlite3', () => {
+  const js = compile('database "app.db"');
+  if (!js.includes("require('better-sqlite3')")) throw new Error('missing require better-sqlite3');
+});
+
+test('"database" generates const db', () => {
+  const js = compile('database "app.db"');
+  if (!js.includes('const db')) throw new Error('missing const db');
+});
+
+test('"query" block compiles to db.prepare().all()', () => {
+  const src = 'query\n    SELECT * FROM users\ndone';
+  const js = compile(src);
+  if (!js.includes('db.prepare(')) throw new Error('missing db.prepare');
+  if (!js.includes('.all()'))       throw new Error('missing .all()');
+  if (!js.includes('SELECT * FROM users')) throw new Error('missing SQL');
+});
+
+test('"insert" block compiles to db.prepare().run()', () => {
+  const src = 'insert\n    INSERT INTO users (name) VALUES ("Alice")\ndone';
+  const js = compile(src);
+  if (!js.includes('db.prepare(')) throw new Error('missing db.prepare');
+  if (!js.includes('.run()'))       throw new Error('missing .run()');
+});
+
+test('"update" block compiles to db.prepare().run()', () => {
+  const src = 'update\n    UPDATE users SET name = "Bob" WHERE id = 1\ndone';
+  const js = compile(src);
+  if (!js.includes('.run()')) throw new Error('missing .run()');
+});
+
+test('"delete" block compiles to db.prepare().run()', () => {
+  const src = 'delete\n    DELETE FROM users WHERE id = 1\ndone';
+  const js = compile(src);
+  if (!js.includes('.run()')) throw new Error('missing .run()');
+});
+
+test('"execute" block compiles to db.exec()', () => {
+  const src = 'execute\n    CREATE TABLE users (id INTEGER PRIMARY KEY)\ndone';
+  const js = compile(src);
+  if (!js.includes('db.exec(')) throw new Error('missing db.exec');
+});
+
+// ── v0.6 — CLI updates ────────────────────────────────────────────────────────
+
+console.log('\nv0.6 — CLI updates');
+
+test('plain version shows 0.6.0 (CLI)', () => {
+  const out = runCli(['version'], process.cwd());
+  if (!out.includes('0.6.0')) throw new Error(`Expected 0.6.0 but got: ${out}`);
+});
+
+test('plain help mentions v0.6 features', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('0.6')) throw new Error('"0.6" missing from help');
+});
+
+test('plain help includes "route"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('route')) throw new Error('"route" missing from help');
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

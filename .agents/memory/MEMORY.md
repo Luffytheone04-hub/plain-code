@@ -1,0 +1,3 @@
+- [Plain compiler AST conditions](plain-ast-conditions.md) — IfStatement/WhileStatement use { condition } not { left, operator, right }; condition is BinaryCondition | UnaryCondition | BetweenCondition | StringCondition
+- [Plain lexer SQL raw-mode](plain-lexer-sql-mode.md) — query/insert/update/delete/execute switch lexer to raw-collection mode; emits SQL_BODY + DONE to avoid SQL chars breaking tokenizer
+- [Plain v0.6 version](plain-version.md) — compiler is 0.6.0; package.json + cli.js + plain-vscode/package.json all track this; tests assert 0.6.0

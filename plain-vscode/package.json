@@ -2,7 +2,7 @@
     "name": "plain-language",
     "displayName": "Plain Language",
     "description": "Syntax highlighting and language support for the Plain programming language (.pln files)",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "publisher": "ayoxx",
     "engines": {
         "vscode": "^1.70.0"
@@ -28,6 +28,12 @@
                 "language": "plain",
                 "scopeName": "source.plain",
                 "path": "./syntaxes/plain.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "plain",
+                "path": "./snippets/plain.code-snippets"
             }
         ]
     },

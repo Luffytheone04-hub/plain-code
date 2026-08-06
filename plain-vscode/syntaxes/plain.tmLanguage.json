@@ -48,7 +48,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.plain",
-                    "match": "\\b(if|otherwise|done|for|each|in|while|when|listen)\\b"
+                    "match": "\\b(if|otherwise|done|for|each|every|in|while|when|listen)\\b"
                 },
                 {
                     "name": "keyword.declaration.plain",
@@ -56,15 +56,27 @@
                 },
                 {
                     "name": "keyword.operator.plain",
-                    "match": "\\b(becomes|as|give|show|reply|serve|note)\\b"
+                    "match": "\\b(becomes|as|give|show|reply|serve|note|print)\\b"
                 },
                 {
                     "name": "keyword.operator.comparison.plain",
-                    "match": "\\b(is|greater|less|than|or|equal|to)\\b"
+                    "match": "\\b(is|greater|less|than|or|equal|to|above|below|at|least|most|not|empty|contains|starts|ends|with|between|and)\\b"
+                },
+                {
+                    "name": "keyword.other.web.plain",
+                    "match": "\\b(web|app|route|start)\\b"
+                },
+                {
+                    "name": "keyword.other.database.plain",
+                    "match": "\\b(database|query|insert|update|delete|execute)\\b"
                 },
                 {
                     "name": "keyword.other.plain",
                     "match": "\\b(someone|visits|on|folder|json)\\b"
+                },
+                {
+                    "name": "support.function.stdlib.plain",
+                    "match": "\\b(readFile|writeFile|fileExists|sleep|time|date|jsonEncode|jsonDecode|env|exit|uuid)(?=\\s*\\()"
                 },
                 {
                     "name": "constant.language.plain",

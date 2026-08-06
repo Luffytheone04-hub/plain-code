@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plain — Intent-Oriented Programming Language</title>
+<meta name="description" content="Plain is an IOPL that lets you write programs in near-English sentences. Compiles to JavaScript.">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0f1117;
+    --surface: #181c27;
+    --border:  #2a2f42;
+    --accent:  #4f80ff;
+    --accent2: #38d9a9;
+    --text:    #e4e8f0;
+    --muted:   #8892aa;
+    --code-bg: #1a1f2e;
+    --radius:  8px;
+    --max-w:   1100px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+
+  /* ── Nav ────────────────────────────────────────────────────────────────── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,17,23,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+  }
+  nav .inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+  }
+  .logo { font-weight: 700; font-size: 1.15rem; color: var(--text); text-decoration: none; }
+  .logo span { color: var(--accent); }
+  .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: .9rem; transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+
+  /* ── Layout ─────────────────────────────────────────────────────────────── */
+  .page { max-width: var(--max-w); margin: 0 auto; padding: 0 2rem 4rem; }
+
+  /* ── Hero ───────────────────────────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 5rem 1rem 4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(79,128,255,.15);
+    color: var(--accent);
+    border: 1px solid rgba(79,128,255,.3);
+    border-radius: 100px;
+    padding: .25rem .85rem;
+    font-size: .8rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    margin-bottom: 1.5rem;
+  }
+  .hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; line-height: 1.15; margin-bottom: 1rem; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { font-size: 1.1rem; color: var(--muted); max-width: 560px; margin: 0 auto 2.5rem; }
+  .cta-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block;
+    padding: .7rem 1.6rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    font-size: .95rem;
+    text-decoration: none;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-ghost   { background: transparent; color: var(--text); border: 1px solid var(--border); }
+
+  /* ── Code comparison ────────────────────────────────────────────────────── */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 3rem 0;
+  }
+  @media (max-width: 680px) { .compare { grid-template-columns: 1fr; } }
+
+  /* ── Sections ───────────────────────────────────────────────────────────── */
+  section { padding: 3.5rem 0; border-bottom: 1px solid var(--border); }
+  section:last-child { border-bottom: none; }
+  .section-label {
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: .6rem;
+  }
+  h2 { font-size: 1.9rem; font-weight: 700; margin-bottom: .75rem; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: .5rem; color: var(--accent2); }
+  p  { color: var(--muted); margin-bottom: 1rem; }
+
+  /* ── Code blocks ────────────────────────────────────────────────────────── */
+  .code-card {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .code-card .label {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: .5rem 1rem;
+    font-size: .75rem;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  pre {
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    font-size: .88rem;
+    line-height: 1.6;
+    tab-size: 4;
+  }
+  code { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; }
+  code .kw  { color: #a78bfa; }   /* keywords */
+  code .str { color: #6ee7b7; }   /* strings */
+  code .num { color: #fbbf24; }   /* numbers */
+  code .cmt { color: #4b5563; }   /* comments */
+  code .fn  { color: #60a5fa; }   /* function names */
+  code .op  { color: #f472b6; }   /* operators */
+
+  /* ── Feature grid ───────────────────────────────────────────────────────── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-top: 2rem;
+  }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    transition: border-color .2s;
+  }
+  .feature-card:hover { border-color: var(--accent); }
+  .feature-card .icon { font-size: 1.5rem; margin-bottom: .75rem; }
+  .feature-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: .35rem; color: var(--text); }
+  .feature-card p  { font-size: .88rem; color: var(--muted); margin: 0; }
+
+  /* ── Table ──────────────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: .9rem; }
+  th, td { text-align: left; padding: .65rem 1rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+  td code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: .1em .4em; font-size: .85rem; color: var(--accent2); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ── Install strip ──────────────────────────────────────────────────────── */
+  .install-strip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  .install-strip span { color: var(--muted); font-size: .9rem; }
+  .install-cmd {
+    font-family: monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: .5rem 1.25rem;
+    color: var(--accent2);
+    font-size: .95rem;
+    cursor: pointer;
+    user-select: all;
+  }
+
+  /* ── Footer ─────────────────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: .85rem;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <a class="logo" href="#"><span>Plain</span> v0.6</a>
+    <ul class="nav-links">
+      <li><a href="#quickstart">Quick Start</a></li>
+      <li><a href="#language">Language</a></li>
+      <li><a href="#stdlib">Stdlib</a></li>
+      <li><a href="#web">Web</a></li>
+      <li><a href="#database">Database</a></li>
+      <li><a href="#cli">CLI</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="badge">v0.6 — Final Feature Release</div>
+  <h1>When even a<br><em>simple sentence</em> can be code.</h1>
+  <p>Plain is an Intent-Oriented Programming Language. Write programs the way you'd explain them to a person. The compiler handles the rest.</p>
+  <div class="cta-group">
+    <a class="btn btn-primary" href="#quickstart">Get Started</a>
+    <a class="btn btn-ghost" href="#language">View Language →</a>
+  </div>
+</div>
+
+<!-- ── Compare ────────────────────────────────────────────────────────────── -->
+<div class="compare">
+  <div class="code-card">
+    <div class="label">Plain</div>
+    <pre><code><span class="kw">remember</span> name <span class="kw">as</span> <span class="str">"Ayokunle"</span>
+<span class="kw">remember</span> age  <span class="kw">as</span> <span class="num">17</span>
+
+<span class="kw">if</span> age <span class="kw">is at least</span> <span class="num">18</span>
+    <span class="kw">show</span> <span class="str">"Adult"</span>
+<span class="kw">otherwise</span>
+    <span class="kw">show</span> <span class="str">"Teenager"</span>
+<span class="kw">done</span>
+
+<span class="kw">for every</span> i <span class="kw">in</span> players
+    <span class="fn">print</span>(i)
+<span class="kw">done</span></code></pre>
+  </div>
+  <div class="code-card">
+    <div class="label">Generated JavaScript</div>
+    <pre><code><span class="kw">const</span> name = <span class="str">"Ayokunle"</span>;
+<span class="kw">const</span> age  = <span class="num">17</span>;
+
+<span class="kw">if</span> (age >= <span class="num">18</span>) {
+    console.<span class="fn">log</span>(<span class="str">"Adult"</span>);
+} <span class="kw">else</span> {
+    console.<span class="fn">log</span>(<span class="str">"Teenager"</span>);
+}
+
+<span class="kw">for</span> (<span class="kw">const</span> i <span class="kw">of</span> players) {
+    console.<span class="fn">log</span>(i);
+}</code></pre>
+  </div>
+</div>
+
+<!-- ── Quick Start ─────────────────────────────────────────────────────────── -->
+<section id="quickstart">
+  <div class="section-label">Setup</div>
+  <h2>Quick Start</h2>
+  <p>Plain compiles <code>.pln</code> files to JavaScript and runs them with Node.js. No configuration required.</p>
+
+  <div class="install-strip">
+    <span>Install globally via npm</span>
+    <code class="install-cmd">npm install -g @ayoxx/plain-code</code>
+  </div>
+
+  <div class="code-card" style="margin-bottom:1rem">
+    <div class="label">Create a project</div>
+    <pre><code>plain new myapp
+cd myapp
+plain install
+plain run app.pln</code></pre>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">🔍</div>
+      <h4>plain check</h4>
+      <p>Validate syntax without running. Great for CI pipelines.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">✨</div>
+      <h4>plain fmt</h4>
+      <p>Auto-format your <code>.pln</code> file with consistent indentation and spacing.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📦</div>
+      <h4>plain add</h4>
+      <p>Install npm packages and record them in <code>plain.json</code>.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔨</div>
+      <h4>plain build</h4>
+      <p>Compile to <code>.js</code> without executing — inspect the output.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Language ──────────────────────────────────────────────────────────── -->
+<section id="language">
+  <div class="section-label">Language Reference</div>
+  <h2>Language Features</h2>
+
+  <h3>Variables</h3>
+  <div class="code-card" style="margin-bottom:1.5rem">
+    <pre><code><span class="kw">remember</span> name <span class="kw">as</span> <span class="str">"Ayokunle"</span>
+<span class="kw">remember</span> score <span class="kw">as</span> <span class="num">100</span>
+score <span class="kw">becomes</span> score + <span class="num">10</span></code></pre>
+  </div>
+
+  <h3>Comparisons (v0.6)</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>JavaScript</th></tr></thead>
+    <tbody>
+      <tr><td><code>is equal to</code> / <code>is</code></td><td><code>===</code></td></tr>
+      <tr><td><code>is not</code></td><td><code>!==</code></td></tr>
+      <tr><td><code>is greater than</code> / <code>is above</code></td><td><code>&gt;</code></td></tr>
+      <tr><td><code>is less than</code> / <code>is below</code></td><td><code>&lt;</code></td></tr>
+      <tr><td><code>is at least</code></td><td><code>&gt;=</code></td></tr>
+      <tr><td><code>is at most</code></td><td><code>&lt;=</code></td></tr>
+      <tr><td><code>is empty</code></td><td><code>.length === 0</code></td></tr>
+      <tr><td><code>is not empty</code></td><td><code>.length &gt; 0</code></td></tr>
+      <tr><td><code>contains "x"</code></td><td><code>.includes("x")</code></td></tr>
+      <tr><td><code>starts with "x"</code></td><td><code>.startsWith("x")</code></td></tr>
+      <tr><td><code>ends with "x"</code></td><td><code>.endsWith("x")</code></td></tr>
+      <tr><td><code>between A and B</code></td><td><code>&gt;= A &amp;&amp; &lt;= B</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Control flow</h3>
+  <div class="code-card" style="margin-bottom:1.5rem">
+    <pre><code><span class="kw">if</span> age <span class="kw">between</span> <span class="num">13</span> <span class="kw">and</span> <span class="num">19</span>
+    <span class="kw">show</span> <span class="str">"Teenager"</span>
+<span class="kw">otherwise</span>
+    <span class="kw">show</span> <span class="str">"Not a teenager"</span>
+<span class="kw">done</span>
+
+<span class="kw">while</span> x <span class="kw">is above</span> <span class="num">0</span>
+    x <span class="kw">becomes</span> x <span class="op">-</span> <span class="num">1</span>
+<span class="kw">done</span>
+
+<span class="kw">for every</span> item <span class="kw">in</span> basket   <span class="cmt">// alias for "for each"</span>
+    <span class="kw">show</span> item
+<span class="kw">done</span></code></pre>
+  </div>
+
+  <h3>Functions</h3>
+  <div class="code-card" style="margin-bottom:1.5rem">
+    <pre><code><span class="kw">make</span> <span class="fn">add</span>(a, b)
+    <span class="kw">give</span> a <span class="op">+</span> b
+<span class="kw">done</span>
+
+<span class="kw">show</span> <span class="fn">add</span>(<span class="num">5</span>, <span class="num">7</span>)   <span class="cmt">// 12</span></code></pre>
+  </div>
+
+  <h3>Objects &amp; Arrays</h3>
+  <div class="code-card">
+    <pre><code><span class="kw">remember</span> user <span class="kw">as</span>
+    name <span class="kw">is</span> <span class="str">"Ayokunle"</span>
+    age  <span class="kw">is</span> <span class="num">17</span>
+<span class="kw">done</span>
+
+<span class="kw">remember</span> scores <span class="kw">as</span> [<span class="num">90</span>, <span class="num">85</span>, <span class="num">92</span>]
+<span class="kw">show</span> scores[<span class="num">0</span>]</code></pre>
+  </div>
+</section>
+
+<!-- ── Stdlib ─────────────────────────────────────────────────────────────── -->
+<section id="stdlib">
+  <div class="section-label">Standard Library</div>
+  <h2>Built-in Functions</h2>
+  <p>All standard library functions are available without any <code>use</code> or import statement.</p>
+
+  <h3>I/O &amp; System</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>Compiles to</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>print(x)</code></td><td><code>console.log(x)</code></td><td>Print a value</td></tr>
+      <tr><td><code>show x</code></td><td><code>console.log(x)</code></td><td>Print a value (statement form)</td></tr>
+      <tr><td><code>env("KEY")</code></td><td><code>process.env["KEY"]</code></td><td>Read an environment variable</td></tr>
+      <tr><td><code>exit(code)</code></td><td><code>process.exit(code)</code></td><td>Exit the process</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Files</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>readFile("path")</code></td><td>Read a file as UTF-8 text</td></tr>
+      <tr><td><code>writeFile("path", content)</code></td><td>Write text to a file</td></tr>
+      <tr><td><code>fileExists("path")</code></td><td>Check if a file exists (returns true/false)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Time &amp; Utilities</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+    <tbody>
+      <tr><td><code>time()</code></td><td><code>Date.now()</code></td></tr>
+      <tr><td><code>date()</code></td><td><code>new Date().toISOString()</code></td></tr>
+      <tr><td><code>sleep(ms)</code></td><td>Synchronous sleep via <code>Atomics.wait</code></td></tr>
+      <tr><td><code>uuid()</code></td><td><code>require('crypto').randomUUID()</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>JSON</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+    <tbody>
+      <tr><td><code>jsonEncode(value)</code></td><td><code>JSON.stringify(value)</code></td></tr>
+      <tr><td><code>jsonDecode(string)</code></td><td><code>JSON.parse(string)</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Strings &amp; Numbers</h3>
+  <table>
+    <thead><tr><th>Plain</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>length(x)</code></td><td>Length of array or string</td></tr>
+      <tr><td><code>uppercase(x)</code></td><td>Convert to uppercase</td></tr>
+      <tr><td><code>lowercase(x)</code></td><td>Convert to lowercase</td></tr>
+      <tr><td><code>round(x)</code></td><td>Round to nearest integer</td></tr>
+      <tr><td><code>random()</code></td><td>Random number 0–1</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── Web ───────────────────────────────────────────────────────────────── -->
+<section id="web">
+  <div class="section-label">Web Apps</div>
+  <h2>Express Developer Experience</h2>
+  <p>Two styles — choose the one that fits your needs.</p>
+
+  <div class="compare">
+    <div class="code-card">
+      <div class="label">v0.6 shorthand (new)</div>
+      <pre><code><span class="kw">web app</span>
+
+<span class="kw">route</span> <span class="str">"/"</span>
+    <span class="kw">reply</span> <span class="str">"Hello!"</span>
+<span class="kw">done</span>
+
+<span class="kw">route</span> <span class="str">"/api/status"</span>
+    <span class="kw">reply json</span>
+        status <span class="kw">is</span> <span class="str">"ok"</span>
+    <span class="kw">done</span>
+<span class="kw">done</span>
+
+<span class="kw">start</span> <span class="num">3000</span></code></pre>
+    </div>
+    <div class="code-card">
+      <div class="label">Classic style (still works)</div>
+      <pre><code><span class="kw">use</span> express
+
+<span class="kw">remember</span> app <span class="kw">as</span> <span class="fn">express</span>()
+
+<span class="kw">when someone visits</span> <span class="str">"/"</span>
+    <span class="kw">reply</span> <span class="str">"Hello!"</span>
+<span class="kw">done</span>
+
+<span class="kw">listen on</span> <span class="num">3000</span>
+    <span class="kw">show</span> <span class="str">"Running"</span>
+<span class="kw">done</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ── Database ──────────────────────────────────────────────────────────── -->
+<section id="database">
+  <div class="section-label">Database</div>
+  <h2>SQLite Developer Experience</h2>
+  <p>Inline SQL blocks compile to <code>better-sqlite3</code> calls — no ORM, just SQL written naturally.</p>
+
+  <div class="code-card" style="margin-bottom:1rem">
+    <div class="label">database.pln</div>
+    <pre><code><span class="kw">database</span> <span class="str">"app.db"</span>
+
+<span class="kw">execute</span>
+    CREATE TABLE IF NOT EXISTS users (
+        id   INTEGER PRIMARY KEY,
+        name TEXT NOT NULL
+    )
+<span class="kw">done</span>
+
+<span class="kw">insert</span>
+    INSERT INTO users (name) VALUES (<span class="str">'Alice'</span>)
+<span class="kw">done</span>
+
+<span class="kw">query</span>
+    SELECT * FROM users
+<span class="kw">done</span></code></pre>
+  </div>
+
+  <table>
+    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+    <tbody>
+      <tr><td><code>database "file.db"</code></td><td><code>const db = new Database("file.db")</code></td></tr>
+      <tr><td><code>query ... done</code></td><td><code>db.prepare(`...`).all()</code></td></tr>
+      <tr><td><code>insert ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
+      <tr><td><code>update ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
+      <tr><td><code>delete ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
+      <tr><td><code>execute ... done</code></td><td><code>db.exec(`...`)</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ── CLI ──────────────────────────────────────────────────────────────── -->
+<section id="cli">
+  <div class="section-label">CLI Reference</div>
+  <h2>All Commands</h2>
+
+  <table>
+    <thead><tr><th>Command</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>plain run &lt;file.pln&gt;</code></td><td>Compile and execute</td></tr>
+      <tr><td><code>plain build &lt;file.pln&gt;</code></td><td>Compile to <code>.js</code> without running</td></tr>
+      <tr><td><code>plain check &lt;file.pln&gt;</code></td><td>Syntax check only</td></tr>
+      <tr><td><code>plain fmt &lt;file.pln&gt;</code></td><td>Format in-place</td></tr>
+      <tr><td><code>plain new [name]</code></td><td>Create a new project</td></tr>
+      <tr><td><code>plain init</code></td><td>Create <code>plain.json</code> in current directory</td></tr>
+      <tr><td><code>plain install</code></td><td>Install dependencies from <code>plain.json</code></td></tr>
+      <tr><td><code>plain add &lt;pkg&gt;</code></td><td>Install a package and add to <code>plain.json</code></td></tr>
+      <tr><td><code>plain remove &lt;pkg&gt;</code></td><td>Remove a package</td></tr>
+      <tr><td><code>plain update</code></td><td>Update all installed packages</td></tr>
+      <tr><td><code>plain version</code></td><td>Print compiler version</td></tr>
+      <tr><td><code>plain help</code></td><td>Show help text</td></tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin-top:1.5rem">CLI Output (v0.6)</h3>
+  <div class="code-card">
+    <div class="label">Terminal</div>
+    <pre><code>$ plain run app.pln
+<span class="kw">✓</span> tokenize
+<span class="kw">✓</span> parse
+<span class="kw">✓</span> generate
+<span class="kw">✓</span> run
+
+$ plain check app.pln
+<span class="kw">✓</span> app.pln — no errors found. (3ms)
+
+$ plain fmt app.pln
+<span class="kw">✓</span> Formatted app.pln</code></pre>
+  </div>
+</section>
+
+<!-- ── VS Code ───────────────────────────────────────────────────────────── -->
+<section>
+  <div class="section-label">Editor</div>
+  <h2>VS Code Extension</h2>
+  <p>The <strong>Plain Language</strong> extension provides syntax highlighting, snippets, bracket matching, and code folding for <code>.pln</code> files.</p>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">🎨</div>
+      <h4>Syntax Highlighting</h4>
+      <p>All keywords, strings, numbers, operators, and stdlib functions coloured.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⚡</div>
+      <h4>Snippets</h4>
+      <p>Type <code>if</code>, <code>make</code>, <code>webapp</code>, <code>route</code>, <code>foreach</code>, and more — press Tab to expand.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📁</div>
+      <h4>File Icon</h4>
+      <p>Custom file icon for <code>.pln</code> files in the explorer sidebar.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🔧</div>
+      <h4>Language Config</h4>
+      <p>Auto-closing brackets, comment toggling (<code>//</code>), and <code>done</code>-based block folding.</p>
+    </div>
+  </div>
+</section>
+
+</div><!-- /page -->
+
+<footer>
+  Plain v0.6 · MIT License · Built with intent
+</footer>
+
+</body>
+</html>
