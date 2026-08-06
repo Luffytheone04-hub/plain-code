@@ -30,7 +30,7 @@ Syntax highlighting and language support for the [Plain programming language](ht
    cd plain-vscode
    vsce package
    ```
-   This produces `plain-language-0.5.0.vsix`.
+   This produces `plain-language-1.0.0.vsix`.
 4. Install the VSIX in VS Code:
    - Open VS Code
    - Press `Ctrl+Shift+P` / `Cmd+Shift+P`
@@ -52,7 +52,7 @@ Syntax highlighting and language support for the [Plain programming language](ht
 | Control     | `if` `otherwise` `done` `for` `each` `in` `while` `when` `listen`       |
 | Declaration | `remember` `make` `use` `import`                                         |
 | Action      | `becomes` `as` `give` `show` `reply` `serve` `note`                     |
-| Comparison  | `is` `greater` `less` `than`                                             |
+| Comparison  | `is` `greater` `less` `than` `above` `below` `at` `least` `most` `not` `empty` `contains` `starts` `ends` `with` `between` `and` |
 | Constant    | `true` `false`                                                           |
 
 ---

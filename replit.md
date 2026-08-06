@@ -1,61 +1,57 @@
 # Plain
 
-An Intent-Oriented Programming Language (IOPL) that compiles `.pln` files to JavaScript.
+**Plain** is an Intent-Oriented Programming Language (IOPL) that compiles to JavaScript. You describe **what** you want; the compiler decides **how** to implement it in JavaScript.
 
-Tagline: "When even a simple sentence can be code."
+Version: **1.0.0** (stable)
 
-## Project overview
-- Stack: Node.js (no dependencies)
-- Compiler: `compiler/` — lexer → parser → AST → JS generator → CLI
-- File extension: `.pln`
-- Current version: 0.5.0
+---
 
-## How to run
+## Running tests
 
 ```bash
-node compiler/cli.js run examples/hello.pln
-node compiler/cli.js check app.pln
-node compiler/cli.js fmt app.pln
-node compiler/cli.js build app.pln
+npm test
 ```
 
-## How to test
+257 tests covering lexer, parser, generator, bundler, formatter, CLI, and runtime stdlib.
+
+## CLI usage
 
 ```bash
-node tests/compiler.test.js
+node compiler/cli.js run    <file.pln>   # compile and execute
+node compiler/cli.js build  <file.pln>   # compile to .js
+node compiler/cli.js check  <file.pln>   # syntax check
+node compiler/cli.js fmt    <file.pln>   # format in-place
+node compiler/cli.js new    [name]       # scaffold new project
+node compiler/cli.js version             # print version
+node compiler/cli.js help                # print help
 ```
 
-## Compiler modules
+## Project structure
 
-| File                    | Responsibility                                   |
-|-------------------------|--------------------------------------------------|
-| `compiler/lexer.js`     | Tokenise Plain source into tokens                |
-| `compiler/parser.js`    | Build the AST; emit line/column diagnostics      |
-| `compiler/generator.js` | Generate JavaScript from the AST                 |
-| `compiler/bundler.js`   | Resolve imports, detect circular dependencies    |
-| `compiler/formatter.js` | Format Plain source in-place                     |
-| `compiler/cli.js`       | Command-line interface                           |
+```
+compiler/
+  lexer.js       — tokenises Plain source into tokens
+  parser.js      — builds the AST
+  generator.js   — generates JavaScript from the AST
+  bundler.js     — resolves imports, builds dependency graph
+  formatter.js   — formats Plain source code
+  cli.js         — command-line interface
 
-## CLI commands (v0.5.0)
+tests/
+  compiler.test.js   — 257 tests
+  fixtures/          — bundler test fixtures
 
-| Command                 | Behaviour                                          |
-|-------------------------|----------------------------------------------------|
-| `plain run <file>`      | Compile and execute                                |
-| `plain build <file>`    | Compile to JavaScript                              |
-| `plain check <file>`    | Syntax check only — no output, no execution        |
-| `plain fmt <file>`      | Format file in-place                               |
-| `plain new [name]`      | Scaffold a new Plain project                       |
-| `plain init`            | Create plain.json                                  |
-| `plain install`         | Install declared dependencies                      |
-| `plain add <pkg>`       | Install package and add to plain.json              |
-| `plain remove <pkg>`    | Uninstall package and remove from plain.json       |
-| `plain update`          | Update all installed packages                      |
-| `plain version`         | Print compiler version                             |
-| `plain help`            | Print help text                                    |
+examples/          — example .pln programs
+samples/           — representative programs for GitHub Linguist
+docs/
+  PLAIN_SPEC.md  — language specification (v1.0.0)
+  website/       — documentation website
 
-## VS Code extension
-
-Located in `plain-vscode/`. See `plain-vscode/README.md` for installation instructions.
+plain-vscode/    — VS Code extension (v1.0.0)
+```
 
 ## User preferences
-(none recorded)
+
+- Stabilization release: do not add new syntax or features
+- Follow RFC-0008 strictly: correctness, testing, and documentation over new functionality
+- Keep compiler modules separate (lexer / parser / generator / bundler / formatter)

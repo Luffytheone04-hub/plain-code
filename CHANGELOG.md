@@ -4,6 +4,47 @@ All notable changes to Plain are documented here.
 
 ---
 
+## [1.0.0] — 2026
+
+### Milestone
+
+First stable release of Plain. Language syntax is now frozen.
+
+This release is a quality and polish milestone — no new syntax was added.
+
+### Compiler
+
+- Final audit of lexer, parser, generator, bundler, and formatter
+- Removed dead code (`cmdWarn_example` placeholder)
+- Switched `plain run` internal execution from `execSync` string interpolation to `execFileSync` with argument array
+- Improved comments throughout all compiler modules
+
+### CLI
+
+- Updated `plain help` to list all v1.0 stdlib functions
+- Output message on `plain run` simplified to `Done.`
+- Version bumped to **1.0.0**
+
+### Testing
+
+- 250+ tests covering all language features, CLI, formatter, bundler, and runtime stdlib
+
+### VS Code Extension
+
+- Version bumped to **1.0.0**
+
+### Documentation
+
+- `PLAIN_SPEC.md` updated to v1.0.0 (stable status, complete keyword list, all features documented)
+- Website updated to v1.0
+- `RELEASE_NOTES.md` and `UPGRADE_GUIDE.md` added
+
+### GitHub Linguist
+
+- `samples/` directory added with representative Plain programs
+
+---
+
 ## [0.6.0] — 2026
 
 ### Language

@@ -1,5 +1,10 @@
 # Plain Language Extension — Changelog
 
+## [1.0.0]
+
+- Version bumped to match Plain v1.0.0 stable release
+- No grammar or snippet changes — all v0.6 keywords remain fully highlighted
+
 ## [0.6.0]
 
 - Updated TextMate grammar with all v0.6 keywords:

@@ -1065,9 +1065,9 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 0.6.0', () => {
+test('plain version shows 1.0.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.6.0')) throw new Error(`Expected version 0.6.0 but got: ${out}`);
+  if (!out.includes('1.0.0')) throw new Error(`Expected version 1.0.0 but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
@@ -1335,9 +1335,9 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 0.6.0', () => {
+test('plain version shows 1.0.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.6.0')) throw new Error(`Expected version 0.6.0 but got: ${out}`);
+  if (!out.includes('1.0.0')) throw new Error(`Expected version 1.0.0 but got: ${out}`);
 });
 
 // ── v0.6 — Extended comparisons ──────────────────────────────────────────────
@@ -1695,19 +1695,330 @@ test('"execute" block compiles to db.exec()', () => {
 
 console.log('\nv0.6 — CLI updates');
 
-test('plain version shows 0.6.0 (CLI)', () => {
+test('plain version shows 1.0.0 (CLI)', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('0.6.0')) throw new Error(`Expected 0.6.0 but got: ${out}`);
+  if (!out.includes('1.0.0')) throw new Error(`Expected 1.0.0 but got: ${out}`);
 });
 
-test('plain help mentions v0.6 features', () => {
+test('plain help mentions v1.0 features', () => {
   const out = runCli(['help'], process.cwd());
-  if (!out.includes('0.6')) throw new Error('"0.6" missing from help');
+  if (!out.includes('1.0')) throw new Error('"1.0" missing from help');
 });
 
 test('plain help includes "route"', () => {
   const out = runCli(['help'], process.cwd());
   if (!out.includes('route')) throw new Error('"route" missing from help');
+});
+
+// ── v1.0.0 — Lexer edge cases ────────────────────────────────────────────────
+
+console.log('\nv1.0 — Lexer edge cases');
+
+test('token carries line number', () => {
+  const tokens = tokenize('remember\nshow');
+  if (tokens[0].line !== 1) throw new Error(`Expected line 1 but got ${tokens[0].line}`);
+  if (tokens[1].line !== 2) throw new Error(`Expected line 2 but got ${tokens[1].line}`);
+});
+
+test('token carries column number', () => {
+  const tokens = tokenize('  remember x as 1');
+  if (tokens[0].col !== 3) throw new Error(`Expected col 3 but got ${tokens[0].col}`);
+});
+
+test('tokenizes decimal number', () => {
+  const tokens = tokenize('3.14');
+  if (tokens[0].type !== TOKEN.NUMBER) throw new Error('wrong type');
+  if (tokens[0].value !== 3.14) throw new Error(`wrong value: ${tokens[0].value}`);
+});
+
+test('tokenizes identifier with underscore', () => {
+  const tokens = tokenize('my_var');
+  if (tokens[0].type !== TOKEN.IDENTIFIER) throw new Error('wrong type');
+  if (tokens[0].value !== 'my_var') throw new Error('wrong value');
+});
+
+test('tokenizes identifier with digits', () => {
+  const tokens = tokenize('item2');
+  if (tokens[0].type !== TOKEN.IDENTIFIER) throw new Error('wrong type');
+  if (tokens[0].value !== 'item2') throw new Error('wrong value');
+});
+
+test('throws on unexpected character', () => {
+  try {
+    tokenize('@invalid');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('unexpected')) throw e;
+  }
+});
+
+// ── v1.0.0 — Compiler expression edge cases ───────────────────────────────────
+
+console.log('\nv1.0 — Expression edge cases');
+
+test('empty array literal compiles to []', () => {
+  const js = compile('remember items as []');
+  if (!js.includes('= []')) throw new Error('missing empty array');
+});
+
+test('decimal number literal compiles correctly', () => {
+  const js = compile('remember pi as 3.14');
+  if (!js.includes('3.14')) throw new Error('missing decimal');
+});
+
+test('nested member access compiles correctly', () => {
+  const js = compile('show user.profile.name');
+  if (!js.includes('user.profile.name')) throw new Error('missing nested member access');
+});
+
+test('chained index access compiles correctly', () => {
+  const js = compile('show matrix[0][1]');
+  if (!js.includes('matrix[0][1]')) throw new Error('missing chained index access');
+});
+
+test('member access becomes compiles to assignment', () => {
+  const js = compile('user.profile.age becomes 18');
+  if (!js.includes('user.profile.age = 18')) throw new Error('missing nested assignment');
+});
+
+test('addition expression with strings compiles correctly', () => {
+  const js = compile('remember greeting as "Hello" + " " + "World"');
+  if (!js.includes('"Hello" + " " + "World"')) throw new Error('missing string concat');
+});
+
+test('function call result used in expression', () => {
+  const js = compile('show add(1, 2) + 3');
+  if (!js.includes('add(1, 2) + 3')) throw new Error('missing expression with call');
+});
+
+// ── v1.0.0 — Error message quality ───────────────────────────────────────────
+
+console.log('\nv1.0 — Error message quality');
+
+test('misspelled "mke" suggests "make"', () => {
+  try {
+    compile('mke greet()\n  show "hi"\ndone');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('did you mean')) {
+      throw new Error(`Expected "did you mean" suggestion but got: ${e.message}`);
+    }
+  }
+});
+
+test('misspelled "wihle" suggests "while"', () => {
+  try {
+    compile('wihle x is 0\n  x becomes 1\ndone');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('did you mean')) {
+      throw new Error(`Expected "did you mean" suggestion but got: ${e.message}`);
+    }
+  }
+});
+
+test('unknown package error mentions supported packages', () => {
+  try {
+    compile('use math');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.includes('express')) {
+      throw new Error(`Expected supported packages in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('unterminated string has line and column info', () => {
+  try {
+    tokenize('"missing close');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.match(/Line \d+/)) {
+      throw new Error(`Expected "Line N" in error but got: ${e.message}`);
+    }
+  }
+});
+
+test('missing "as" in remember gives helpful message', () => {
+  try {
+    compile('remember age 16');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('as')) {
+      throw new Error(`Expected "as" in error but got: ${e.message}`);
+    }
+  }
+});
+
+// ── v1.0.0 — Formatter additional coverage ────────────────────────────────────
+
+console.log('\nv1.0 — Formatter additional coverage');
+
+test('format: for each block body is indented', () => {
+  const src = 'for each item in list\nshow item\ndone';
+  const result = format(src);
+  if (!result.includes('    show item')) throw new Error('for each body not indented');
+});
+
+test('format: while block body is indented', () => {
+  const src = 'while x is below 10\nx becomes x + 1\ndone';
+  const result = format(src);
+  if (!result.includes('    x becomes x + 1')) throw new Error('while body not indented');
+});
+
+test('format: route block body is indented', () => {
+  const src = 'route "/"\nreply "Hello"\ndone';
+  const result = format(src);
+  if (!result.includes('    reply "Hello"')) throw new Error('route body not indented');
+});
+
+test('format: nested if inside function is double-indented', () => {
+  const src = 'make check(x)\nif x is 1\nshow "one"\ndone\ndone';
+  const result = format(src);
+  if (!result.includes('        show "one"')) throw new Error('nested if not double-indented');
+});
+
+test('format: object literal body is indented', () => {
+  const src = 'remember user as\nname is "Ayokunle"\ndone';
+  const result = format(src);
+  if (!result.includes('    name is "Ayokunle"')) throw new Error('object body not indented');
+});
+
+// ── v1.0.0 — CLI additional coverage ─────────────────────────────────────────
+
+console.log('\nv1.0 — CLI additional coverage');
+
+test('plain new creates the project directory', () => {
+  const dir = tmpDir();
+  const projectName = 'test-new-project';
+  const projectDir = path.join(dir, projectName);
+  runCli(['new', projectName], dir);
+  if (!fs.existsSync(projectDir)) throw new Error('project directory not created');
+  fs.rmSync(projectDir, { recursive: true, force: true });
+});
+
+test('plain new creates app.pln', () => {
+  const dir = tmpDir();
+  const projectName = 'test-new-pln';
+  const projectDir = path.join(dir, projectName);
+  runCli(['new', projectName], dir);
+  if (!fs.existsSync(path.join(projectDir, 'app.pln'))) throw new Error('app.pln not created');
+  fs.rmSync(projectDir, { recursive: true, force: true });
+});
+
+test('plain new creates plain.json', () => {
+  const dir = tmpDir();
+  const projectName = 'test-new-json';
+  const projectDir = path.join(dir, projectName);
+  runCli(['new', projectName], dir);
+  if (!fs.existsSync(path.join(projectDir, 'plain.json'))) throw new Error('plain.json not created');
+  fs.rmSync(projectDir, { recursive: true, force: true });
+});
+
+test('plain build writes .js output file', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'hello.pln');
+  fs.writeFileSync(plnFile, 'show "hello"\n');
+  runCli(['build', plnFile], dir);
+  const jsFile = path.join(dir, 'hello.js');
+  if (!fs.existsSync(jsFile)) throw new Error('.js output file not created');
+});
+
+test('plain build output file contains valid JS', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'prog.pln');
+  fs.writeFileSync(plnFile, 'remember x as 42\nshow x\n');
+  runCli(['build', plnFile], dir);
+  const js = fs.readFileSync(path.join(dir, 'prog.js'), 'utf8');
+  if (!js.includes('let x = 42')) throw new Error('expected let x = 42 in output');
+  if (!js.includes('console.log(x)')) throw new Error('expected console.log in output');
+});
+
+test('plain help includes "plain new"', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('plain new')) throw new Error('"plain new" missing from help');
+});
+
+test('unknown command shows an error message', () => {
+  const dir = tmpDir();
+  const out = runCli(['doesnotexist'], dir);
+  if (!out.toLowerCase().includes('unknown command')) {
+    throw new Error(`Expected "unknown command" error but got: ${out}`);
+  }
+});
+
+test('plain run on nonexistent file exits with an error', () => {
+  const dir = tmpDir();
+  const out = runCli(['run', 'no_such_file.pln'], dir);
+  if (!out.toLowerCase().includes('cannot find') && !out.toLowerCase().includes('not found') && !out.toLowerCase().includes('resolving')) {
+    throw new Error(`Expected file-not-found error but got: ${out}`);
+  }
+});
+
+// ── v1.0.0 — Compiler regression tests ───────────────────────────────────────
+
+console.log('\nv1.0 — Regression tests');
+
+test('remember with array index read compiles correctly', () => {
+  const js = compile('remember players as ["a", "b"]\nremember first as players[0]');
+  if (!js.includes('let first = players[0]')) throw new Error('missing index read');
+});
+
+test('becomes with object member compiles to assignment', () => {
+  const js = compile('user.score becomes 100');
+  if (!js.includes('user.score = 100')) throw new Error('missing member assignment');
+});
+
+test('"is equal to" is not a valid alias (is is the keyword)', () => {
+  // "is" compiles to ===; "equal" and "to" are not keywords the parser handles
+  // as a multi-word operator. Only "is" alone triggers equality.
+  const js = compile('if x is 5\n  show "five"\ndone');
+  if (!js.includes('x === 5')) throw new Error('expected x === 5');
+});
+
+test('for each with function call in body', () => {
+  const src = 'for each item in list\n  greet(item)\ndone';
+  const js = compile(src);
+  if (!js.includes('greet(item)')) throw new Error('missing function call in loop body');
+});
+
+test('nested function declarations compile correctly', () => {
+  const src = 'make outer()\n    make inner()\n        show "hi"\n    done\ndone';
+  const js = compile(src);
+  if (!js.includes('function outer()')) throw new Error('missing outer');
+  if (!js.includes('function inner()')) throw new Error('missing inner');
+});
+
+test('multiple show statements compile to multiple console.log calls', () => {
+  const src = 'show "a"\nshow "b"\nshow "c"';
+  const js = compile(src);
+  const count = (js.match(/console\.log/g) || []).length;
+  if (count !== 3) throw new Error(`Expected 3 console.log calls but got ${count}`);
+});
+
+test('reply json with multiple properties compiles correctly', () => {
+  const src = 'when someone visits "/"\n  reply json\n    name is "Plain"\n    version is "1.0"\n  done\ndone';
+  const js = compile(src);
+  if (!js.includes('"name": "Plain"')) throw new Error('missing name property');
+  if (!js.includes('"version": "1.0"')) throw new Error('missing version property');
+});
+
+test('serve folder compiles with correct path', () => {
+  const js = compile('serve folder "dist"');
+  if (!js.includes('"dist"')) throw new Error('missing folder path');
+  if (!js.includes('express.static')) throw new Error('missing static call');
+});
+
+test('while loop with is not condition', () => {
+  const src = 'remember x as 0\nwhile x is not 10\n  x becomes x + 1\ndone';
+  const js = compile(src);
+  if (!js.includes('while (x !== 10)')) throw new Error('expected while x !== 10');
+});
+
+test('between condition in while loop', () => {
+  const src = 'remember x as 5\nif x between 1 and 10\n  show "in range"\ndone';
+  const js = compile(src);
+  if (!js.includes('x >= 1 && x <= 10')) throw new Error('expected between range');
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

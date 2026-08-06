@@ -24,7 +24,7 @@ const { generate } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 
-const VERSION = '0.6.0';
+const VERSION = '1.0.0';
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -59,14 +59,16 @@ Commands
   plain version            Print the compiler version
   plain help               Print this help text
 
-v0.6 Language Features
+v1.0 Language Features
 
-  New comparisons: is above, is below, is at least, is at most,
-                   is not, is empty, is not empty, contains,
-                   starts with, ends with, between … and
-  Alias:           for every … in …  (same as for each)
-  Web shorthand:   web app / route "…" … done / start <port>
-  Database:        database "…" / query … done / insert … done
+  Comparisons:  is above, is below, is at least, is at most,
+                is not, is empty, is not empty, contains,
+                starts with, ends with, between … and
+  Alias:        for every … in …  (same as for each)
+  Web:          web app / route "…" … done / start <port>
+  Database:     database "…" / query … done / insert … done
+  Stdlib:       print, readFile, writeFile, fileExists, sleep,
+                time, date, jsonEncode, jsonDecode, env, exit, uuid
 
 Examples:
   plain run hello.pln
@@ -208,11 +210,11 @@ function cmdRun(filePath) {
   const tmpFile = path.join(__dirname, '_plain_out.js');
   fs.writeFileSync(tmpFile, js, 'utf8');
   try {
-    execSync(`node ${tmpFile}`, { stdio: 'inherit' });
+    execFileSync(process.execPath, [tmpFile], { stdio: 'inherit' });
   } finally {
     fs.unlinkSync(tmpFile);
   }
-  console.log('\nCompilation successful.');
+  console.log('\nDone.');
 }
 
 function cmdBuild(filePath) {
@@ -477,12 +479,6 @@ function cmdFmt(filePath) {
 
 function cmdVersion() {
   console.log(`Plain v${VERSION}`);
-}
-
-// eslint-disable-next-line no-unused-vars
-function cmdWarn_example() {
-  // Example of using the warn helper — not a real command
-  warn('This is how warnings look.');
 }
 
 function cmdHelp() {

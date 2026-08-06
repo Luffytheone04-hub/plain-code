@@ -1,7 +1,7 @@
-# Plain Language Specification (v0.6.0)
+# Plain Language Specification (v1.0.0)
 
-Version: 0.6.0
-Status: Draft
+Version: 1.0.0
+Status: Stable
 File Extension: .pln
 
 Tagline: "When even a simple sentence can be code."
@@ -67,7 +67,24 @@ Reassign:
         show "Minor"
     done
 
-Comparisons: `is`, `is greater than`, `is less than`
+### Comparison Operators
+
+| Plain                        | JavaScript         |
+|------------------------------|--------------------|
+| `is` / `is equal to`         | `===`              |
+| `is not`                     | `!==`              |
+| `is greater than`            | `>`                |
+| `is above`                   | `>`                |
+| `is less than`               | `<`                |
+| `is below`                   | `<`                |
+| `is at least`                | `>=`               |
+| `is at most`                 | `<=`               |
+| `is empty`                   | `.length === 0`    |
+| `is not empty`               | `.length > 0`      |
+| `contains "x"`               | `.includes("x")`   |
+| `starts with "x"`            | `.startsWith("x")` |
+| `ends with "x"`              | `.endsWith("x")`   |
+| `between A and B`            | `>= A && <= B`     |
 
 ---
 
@@ -121,6 +138,12 @@ For each:
         show player
     done
 
+For every (alias for for each):
+
+    for every item in basket
+        show item
+    done
+
 While:
 
     while age is less than 18
@@ -131,13 +154,44 @@ While:
 
 ## Standard Library
 
+All built-in functions are available without any `use` or `import` statement.
+
+### Strings & Numbers
+
 | Plain           | JavaScript equivalent   |
 |-----------------|-------------------------|
-| length(x)       | (x).length              |
-| uppercase(x)    | (x).toUpperCase()       |
-| lowercase(x)    | (x).toLowerCase()       |
-| random()        | Math.random()           |
-| round(x)        | Math.round(x)           |
+| `length(x)`     | `(x).length`            |
+| `uppercase(x)`  | `(x).toUpperCase()`     |
+| `lowercase(x)`  | `(x).toLowerCase()`     |
+| `random()`      | `Math.random()`         |
+| `round(x)`      | `Math.round(x)`         |
+
+### I/O & Files
+
+| Plain                        | JavaScript equivalent                            |
+|------------------------------|--------------------------------------------------|
+| `print(x)`                   | `console.log(x)`                                 |
+| `readFile(path)`             | `require('fs').readFileSync(path, 'utf8')`       |
+| `writeFile(path, content)`   | `require('fs').writeFileSync(path, content, 'utf8')` |
+| `fileExists(path)`           | `require('fs').existsSync(path)`                 |
+
+### Time & System
+
+| Plain          | JavaScript equivalent                  |
+|----------------|----------------------------------------|
+| `time()`       | `Date.now()`                           |
+| `date()`       | `new Date().toISOString()`             |
+| `sleep(ms)`    | `Atomics.wait(...)` (synchronous)      |
+| `uuid()`       | `require('crypto').randomUUID()`       |
+| `env(key)`     | `process.env[key]`                     |
+| `exit(code)`   | `process.exit(code)`                   |
+
+### JSON
+
+| Plain              | JavaScript equivalent       |
+|--------------------|-----------------------------|
+| `jsonEncode(x)`    | `JSON.stringify(x)`         |
+| `jsonDecode(s)`    | `JSON.parse(s)`             |
 
 ---
 
@@ -175,7 +229,7 @@ Output: one combined JavaScript file with `math.pln` code before `app.pln` code.
 
 ---
 
-## Runtime Packages / Imports
+## Runtime Packages
 
 Supported packages:
 
@@ -188,7 +242,9 @@ Unknown packages produce a friendly compiler error.
 
 ---
 
-## Express Server (v0.3)
+## Express Server
+
+Classic style:
 
     use express
 
@@ -203,7 +259,7 @@ Unknown packages produce a friendly compiler error.
     when someone visits "/api/status"
         reply json
             status is "ok"
-            version is "0.3"
+            version is "1.0"
         done
     done
 
@@ -211,34 +267,48 @@ Unknown packages produce a friendly compiler error.
         show "Server running at http://localhost:3000"
     done
 
+Shorthand style:
+
+    web app
+
+    route "/"
+        reply "Hello from Plain!"
+    done
+
+    start 3000
+
 ### Routes
 
     when someone visits "<path>"
         ...
     done
 
-Compiles to: `app.get(path, (req, res) => { ... })`
+    route "<path>"
+        ...
+    done
+
+Both compile to: `app.get(path, (req, res) => { ... })`
 
 Inside route bodies:
 
 - `request` → `req`
 - `response` → `res`
 
-### Sending responses
+### Sending Responses
 
     reply "Hello"          → res.send("Hello")
     reply user             → res.send(user)
 
-### JSON responses
+### JSON Responses
 
     reply json
         name is "Plain"
-        version is "0.3"
+        version is "1.0"
     done
 
-Compiles to: `res.json({ "name": "Plain", "version": "0.3" })`
+Compiles to: `res.json({ "name": "Plain", "version": "1.0" })`
 
-### Static files
+### Static Files
 
     serve folder "public"
 
@@ -252,9 +322,17 @@ Compiles to: `app.use(express.static("public"))`
 
 Compiles to: `app.listen(3000, () => { ... })`
 
+### Start (shorthand)
+
+    start 3000
+
+Compiles to: `app.listen(3000)`
+
 ---
 
-## SQLite (v0.3)
+## SQLite
+
+Classic style:
 
     use sqlite
 
@@ -262,9 +340,36 @@ Compiles to: `app.listen(3000, () => { ... })`
 
 Compiles to: `new Database("database.db")`
 
+Shorthand style:
+
+    database "app.db"
+
+    execute
+        CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)
+    done
+
+    insert
+        INSERT INTO users (name) VALUES ('Alice')
+    done
+
+    query
+        SELECT * FROM users
+    done
+
+### SQL Block Commands
+
+| Plain              | Compiles to                      |
+|--------------------|----------------------------------|
+| `database "f.db"`  | `const db = new Database("f.db")`|
+| `query ... done`   | `db.prepare(...).all()`          |
+| `insert ... done`  | `db.prepare(...).run()`          |
+| `update ... done`  | `db.prepare(...).run()`          |
+| `delete ... done`  | `db.prepare(...).run()`          |
+| `execute ... done` | `db.exec(...)`                   |
+
 ---
 
-## Developer Experience (v0.5.0)
+## Developer Experience
 
 ### Formatter
 
@@ -278,6 +383,7 @@ Formatting rules:
 - Trailing whitespace removed from every line
 - One blank line between top-level blocks
 - Multiple consecutive blank lines collapsed into one
+- Multi-line array elements indented relative to their enclosing block
 
 ### Syntax Checker
 
@@ -299,12 +405,13 @@ Install `plain-vscode` for:
 - Comment toggling (`//`)
 - Bracket matching
 - Code folding
+- Snippets for common patterns
 
 See `plain-vscode/README.md` for installation instructions.
 
 ---
 
-## Project Management (v0.4.2)
+## Project Management
 
 Plain manages project configuration through `plain.json`.
 
@@ -329,7 +436,7 @@ Plain manages project configuration through `plain.json`.
 | `plain remove <pkg>`    | Uninstalls package, removes it from `plain.json`   |
 | `plain update`          | Runs `npm update` for all installed packages       |
 
-### Dependency validation
+### Dependency Validation
 
 Before compiling, Plain checks that every package referenced by `use` is installed.
 If a package is missing, the compiler prints a friendly error and stops:
@@ -344,18 +451,24 @@ If a package is missing, the compiler prints a friendly error and stops:
     remember  becomes  show
     make      give
     if        otherwise  done
-    for       each       in
+    for       each       every   in
     while
-    use
+    use       import
     when      someone   visits
     listen    on
     reply     json
     serve     folder
     is        greater    less    than
+    above     below      at      least   most
+    not       empty      contains
+    starts    ends       with
+    between   and
+    web       route      start
+    database  query      insert  update  delete  execute
     true      false
     note
 
 ---
 
-This document is the single source of truth for Plain.
+This document is the single source of truth for Plain v1.0.0.
 Every compiler implementation must follow this specification.
