@@ -6,6 +6,7 @@ const { tokenize, TOKEN } = require('../compiler/lexer');
 const { parse } = require('../compiler/parser');
 const { generate } = require('../compiler/generator');
 const { bundle, resolveDependencies } = require('../compiler/bundler');
+const { detectDependencies } = require('../compiler/dependency-detector');
 
 // Helper: bundle a fixture file and return the generated JS
 function bundleFixture(name) {
@@ -52,6 +53,33 @@ function assert(actual, expected) {
 function compile(source) {
   return generate(parse(tokenize(source)));
 }
+
+// ── Runtime dependency detection ────────────────────────────────────────────
+
+console.log('\nRuntime dependency detection');
+
+test('detects express as an npm dependency', () => {
+  assert(JSON.stringify(detectDependencies('use express')), '["express"]');
+});
+
+test('maps sqlite to better-sqlite3', () => {
+  assert(JSON.stringify(detectDependencies('use sqlite')), '["better-sqlite3"]');
+});
+
+test('ignores Node built-in modules', () => {
+  assert(JSON.stringify(detectDependencies('use fs\nuse path')), '[]');
+});
+
+test('removes duplicate runtime dependencies', () => {
+  assert(
+    JSON.stringify(detectDependencies('use express\nuse sqlite\nuse express\nuse sqlite')),
+    '["express","better-sqlite3"]'
+  );
+});
+
+test('returns an empty list for a project without use statements', () => {
+  assert(JSON.stringify(detectDependencies('show "Hello"')), '[]');
+});
 
 // ── Lexer ────────────────────────────────────────────────────────────────────
 

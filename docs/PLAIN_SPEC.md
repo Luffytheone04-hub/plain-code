@@ -238,6 +238,23 @@ Supported packages:
     use fs         → const fs = require('fs');
     use path       → const path = require('path');
 
+### Runtime dependency detection
+
+The compiler exposes a reusable dependency detector that reads Plain source
+without installing packages. It scans every `use` statement and returns a
+unique list of npm package names in first-seen order.
+
+Plain module names are mapped to npm packages:
+
+| Plain module | npm package |
+|--------------|-------------|
+| `express`    | `express`   |
+| `sqlite`     | `better-sqlite3` |
+
+Node built-in modules, including `fs` and `path`, are ignored because they do
+not need to be installed. A source file with no runtime package uses returns
+an empty list.
+
 Unknown packages produce a friendly compiler error.
 
 ---

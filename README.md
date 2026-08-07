@@ -214,6 +214,20 @@ Package "express" is not installed.
 Run: plain add express
 ```
 
+### Runtime dependency detection
+
+Plain can inspect a source file and list the npm packages it needs without
+installing anything. The reusable detector scans `use` statements, maps Plain
+module names to their npm packages, ignores Node built-ins such as `fs` and
+`path`, and removes duplicates.
+
+The current mappings include:
+
+| Plain module | npm package |
+|--------------|-------------|
+| `express`    | `express`   |
+| `sqlite`     | `better-sqlite3` |
+
 ---
 
 ## Web Apps (v0.6)
