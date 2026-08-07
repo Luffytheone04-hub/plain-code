@@ -4,6 +4,56 @@ All notable changes to Plain are documented here.
 
 ---
 
+## [1.1.0] — 2026
+
+### Language — Plain Expressions (RFC-0010)
+
+New natural-language syntax for collections, properties, and files. All v1.0 syntax remains valid.
+
+**Items**
+- `first player from players` → `players[0]`
+- `last player from players` → `players[players.length - 1]`
+- `player one from players` … `player twenty from players` → `players[0]` … `players[19]`
+- Item expressions work as values, assignment targets (`becomes`), conditions, and arguments
+
+**Collections**
+- `players length` → `players.length` (also `length of players`)
+- `add(item to players)` → `players.push(item)`
+- `remove(item from players)` → `players.splice(players.indexOf(item), 1)`
+- `players contains item` (existing v0.6 `contains`) pairs with the new operations
+
+**Properties**
+- `name of user` → `user.name`
+- `city of address of customer` → `customer.address.city` (right-associative)
+- `name of user becomes "Ayo"` → `user.name = "Ayo"`
+
+**Files**
+- `read("users.txt")` → `fs.readFileSync("users.txt", 'utf8')` (new stdlib alias)
+- `write(data to "users.txt")` → `fs.writeFileSync(data, "users.txt", 'utf8')`
+- Existing `readFile()` / `writeFile()` remain unchanged
+
+### Compiler
+
+- `parser.js`: item expressions (`first`/`last`/numbered), `of` property access, `length` postfix, and `to`/`from` special call forms (`add`, `remove`, `write`); friendly diagnostics for missing nouns and non-number words
+- `generator.js`: new AST node generation for all Plain Expressions; `read` added to the stdlib; item expressions supported as assignment targets
+- No lexer or formatter changes — new words remain identifiers for full backward compatibility
+
+### CLI
+
+- Version bumped to **1.1.0**
+- `plain help` lists the v1.1 Plain Expressions feature set
+
+### Testing
+
+- 300+ tests now covering all Plain Expressions, their interactions, backward compatibility, and diagnostics
+
+### Documentation
+
+- `README.md` and `docs/index.html` updated with the Plain Expressions guide
+- `examples/expressions.pln` and `samples/expressions.pln` added
+
+---
+
 ## [1.0.0] — 2026
 
 ### Milestone

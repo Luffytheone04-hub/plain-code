@@ -58,12 +58,17 @@ function detectDependencies(source) {
     : source;
   const dependencies = new Set();
 
-  visit(ast, (moduleName) => {
+  // Only the resolved npm package decides whether a dependency is real.
+  // Plain's friendly module names (e.g. sqlite) must not be mistaken for Node
+  // built-ins just because Node ships a module with the same name.
+  const addPackage = (moduleName) => {
     const packageName = PACKAGE_MAP[moduleName] || moduleName;
-    if (!isBuiltinModule(moduleName) && !isBuiltinModule(packageName)) {
+    if (!isBuiltinModule(packageName)) {
       dependencies.add(packageName);
     }
-  });
+  };
+
+  visit(ast, addPackage);
 
   // Additional check for the `database "..."` shorthand when the source is a string.
   // This ensures detection even if the parser does not produce a DatabaseStatement node.
@@ -71,11 +76,7 @@ function detectDependencies(source) {
     // Look for patterns like: database "file.db" or database 'file.db'
     // We use a simple regex to catch the shorthand.
     if (/database\s+["']/.test(source)) {
-      const moduleName = 'sqlite';
-      const packageName = PACKAGE_MAP[moduleName] || moduleName;
-      if (!isBuiltinModule(moduleName) && !isBuiltinModule(packageName)) {
-        dependencies.add(packageName);
-      }
+      addPackage('sqlite');
     }
   }
 

@@ -25,7 +25,7 @@ const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule } = require('./dependency-detector');
 
-const VERSION = '1.0.1';
+const VERSION = '1.1.0';
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -72,6 +72,16 @@ v1.0 Language Features
   Database:     database "…" / query … done / insert … done
   Stdlib:       print, readFile, writeFile, fileExists, sleep,
                 time, date, jsonEncode, jsonDecode, env, exit, uuid
+
+v1.1 Plain Expressions
+
+  Items:        first player from players / last player from players
+                player one from players (up to twenty)
+  Collections:  players length / add(item to players) /
+                remove(item from players) / players contains item
+  Properties:   name of user / city of address of customer /
+                name of user becomes "Ayo"
+  Files:        read("users.txt") / write(data to "users.txt")
 
 Examples:
   plain run hello.pln

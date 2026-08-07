@@ -9,6 +9,17 @@ const STATEMENT_KEYWORDS = [
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
 ];
 
+// Number words used by the numbered item expression (v1.1):
+//   player one from players   → players[0]
+//   player two from players   → players[1]
+// Zero-based indexing is never exposed to the programmer.
+const NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
+  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+  nineteen: 19, twenty: 20,
+};
+
 // Returns the Levenshtein edit distance between two strings.
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
@@ -216,7 +227,10 @@ function parse(tokens) {
         return { type: 'BecomeStatement', target: expr, value };
       }
 
-      if (expr.type === 'CallExpression') {
+      if (expr.type === 'CallExpression' ||
+          expr.type === 'AddCall' ||
+          expr.type === 'RemoveCall' ||
+          expr.type === 'WriteCall') {
         return { type: 'ExpressionStatement', expression: expr };
       }
 
@@ -519,8 +533,10 @@ function parse(tokens) {
     return left;
   }
 
-  // primary → atom (postfix)*
+  // primary → itemExpr | atom (postfix)*
   function parsePrimary() {
+    const item = tryParseItemExpression();
+    if (item) return item;
     let node = parseAtom();
     while (true) {
       if (peek().type === TOKEN.LBRACKET) {
@@ -532,11 +548,78 @@ function parse(tokens) {
         advance();
         const property = consume(TOKEN.IDENTIFIER, 'Expected a property name after ".".').value;
         node = { type: 'MemberExpression', object: node, property };
+      } else if (peek().type === TOKEN.IDENTIFIER && peek().value === 'of') {
+        if (node.type !== 'Identifier') {
+          throw new Error(makeError(
+            'Expected a property name before "of".\n\nExample:\n  name of user',
+            peek()
+          ));
+        }
+        advance();
+        const object = parsePrimary();
+        node = { type: 'OfExpression', property: node, object };
+      } else if (peek().type === TOKEN.IDENTIFIER && peek().value === 'length') {
+        advance();
+        node = { type: 'LengthExpression', object: node };
       } else {
         break;
       }
     }
     return node;
+  }
+
+  // v1.1 — Item expressions, detected before parseAtom:
+  //   first player from players    → players[0]
+  //   last player from players     → players[players.length - 1]
+  //   player one from players      → players[0]
+  // Shape: three identifiers, the third being "from".
+  function tryParseItemExpression() {
+    const first  = peek();
+    const second = peekAt(1);
+    const third  = peekAt(2);
+    if (first.type  !== TOKEN.IDENTIFIER) return null;
+    if (second.type !== TOKEN.IDENTIFIER) return null;
+    if (third.type  !== TOKEN.IDENTIFIER) return null;
+
+    // "first from players" / "last from players" — missing noun
+    if ((first.value === 'first' || first.value === 'last') && second.value === 'from') {
+      throw new Error(makeError(
+        `Expected a noun after "${first.value}".\n\nExample:\n  ${first.value} player from players`,
+        second
+      ));
+    }
+
+    if (third.value !== 'from') return null;
+
+    if (first.value === 'first') {
+      advance(); // first
+      advance(); // noun
+      advance(); // from
+      const collection = parsePrimary();
+      return { type: 'FirstItem', collection };
+    }
+
+    if (first.value === 'last') {
+      advance(); // last
+      advance(); // noun
+      advance(); // from
+      const collection = parsePrimary();
+      return { type: 'LastItem', collection };
+    }
+
+    if (second.value in NUMBER_WORDS) {
+      const index = NUMBER_WORDS[second.value] - 1;
+      advance(); // noun
+      advance(); // number word
+      advance(); // from
+      const collection = parsePrimary();
+      return { type: 'NumberedItem', index, collection };
+    }
+
+    throw new Error(makeError(
+      `Expected a number word after "${first.value}" before "from".\n\nUse number words like "one", "two", "three".\n\nExample:\n  ${first.value} one from players`,
+      second
+    ));
   }
 
   // atom → STRING | NUMBER | '[' ... ']' | IDENTIFIER '(' args ')' | IDENTIFIER
@@ -594,17 +677,28 @@ function parse(tokens) {
   }
 
   // name(arg, arg, ...)
+  // name(value to collection)  → v1.1 collection/io forms (add, remove, write)
   function parseCallExpression() {
+    const nameToken = peek();
     const name = advance().value;
     consume(TOKEN.LPAREN, `Expected "(" after function name "${name}".`);
-    const args = parseArgList();
+    const { separator, args } = parseArgList();
     consume(TOKEN.RPAREN, 'Expected ")" to close the argument list.');
+    if (separator) return buildSpecialCall(name, separator, args, nameToken);
+    // remove(last player from players): the item expression already consumed
+    // "from <collection>", so reinterpret the single item argument as the
+    // remove(value from collection) operation.
+    if (name === 'remove' && args.length === 1 &&
+        (args[0].type === 'FirstItem' || args[0].type === 'LastItem' || args[0].type === 'NumberedItem')) {
+      return { type: 'RemoveCall', value: args[0], collection: args[0].collection };
+    }
     return { type: 'CallExpression', name, args };
   }
 
   function parseArgList() {
     const args = [];
-    if (peek().type === TOKEN.RPAREN) return args;
+    let separator = null;
+    if (peek().type === TOKEN.RPAREN) return { separator, args };
     if (peek().type === TOKEN.EOF) {
       throw new Error(makeError('Expected ")" to close the argument list before end of file.', peek()));
     }
@@ -616,7 +710,34 @@ function parse(tokens) {
       }
       args.push(parseExpression());
     }
-    return args;
+    // v1.1 — collection expressions: add(item to list) / remove(item from list) / write(data to "file")
+    if (args.length === 1 && peek().type === TOKEN.IDENTIFIER &&
+        (peek().value === 'to' || peek().value === 'from')) {
+      separator = peek().value;
+      advance();
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(makeError(`Expected a value after "${separator}".`, peek()));
+      }
+      args.push(parseExpression());
+    }
+    return { separator, args };
+  }
+
+  // v1.1 — Build a collection or I/O expression from a "to"/"from" special form.
+  function buildSpecialCall(name, separator, args, nameToken) {
+    if (separator === 'to' && name === 'add') {
+      return { type: 'AddCall', value: args[0], collection: args[1] };
+    }
+    if (separator === 'from' && name === 'remove') {
+      return { type: 'RemoveCall', value: args[0], collection: args[1] };
+    }
+    if (separator === 'to' && name === 'write') {
+      return { type: 'WriteCall', data: args[0], file: args[1] };
+    }
+    throw new Error(makeError(
+      `"${name}" is not a valid Plain collection expression.\n\nPlain supports:\n  add(item to collection)\n  remove(item from collection)\n  write(data to "file")`,
+      nameToken
+    ));
   }
 
   // ── Program ────────────────────────────────────────────────────────────────

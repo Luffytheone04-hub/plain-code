@@ -122,6 +122,54 @@ while age is less than 18
 done
 ```
 
+Plain Expressions (v1.1)
+
+Collections, properties, and files read like sentences.
+
+Items
+
+```plain
+remember players as ["Haaland", "Foden", "Rodri"]
+
+show first player from players   // players[0]
+show last player from players    // players[players.length - 1]
+show player two from players     // players[1]
+first player from players becomes "Haaland"  // players[0] = "Haaland"
+```
+
+Number words from `one` to `twenty` map to one-based positions: `player one` is the first item.
+
+Collections
+
+```plain
+show players length              // players.length
+add("Palmer" to players)         // players.push("Palmer")
+remove("Rodri" from players)     // players.splice(players.indexOf("Rodri"), 1)
+
+if players contains "Foden"      // players.includes("Foden")
+    show "Found"
+done
+```
+
+Properties
+
+```plain
+show name of user                // user.name
+show city of address of customer // customer.address.city
+name of user becomes "Ayo"       // user.name = "Ayo"
+```
+
+`of` chains right-to-left: `city of address of customer` reads the city of the address of the customer.
+
+Files
+
+```plain
+remember data as read("users.txt")   // fs.readFileSync("users.txt", 'utf8')
+write(data to "users.txt")           // fs.writeFileSync(data, "users.txt", 'utf8')
+```
+
+The older `readFile()` / `writeFile()` forms still work and are unchanged.
+
 Runtime Standard Library (v0.6)
 
 No imports needed. These functions are built into the compiler:
@@ -130,6 +178,7 @@ Plain Description
 print(x) Print a value (console.log)
 readFile("path") Read a file as UTF-8 text
 writeFile("path", data) Write text to a file
+read("path") Read a file as UTF-8 text (v1.1)
 fileExists("path") Check if a file exists
 sleep(ms) Sleep synchronously
 time() Current Unix timestamp (Date.now())
@@ -405,7 +454,9 @@ Plain/
 │   ├── objects.pln    — objects and property access
 │   ├── loops.pln      — for each and while loops
 │   ├── server.pln     — Express server (v0.3)
-│   └── database.pln   — SQLite connection (v0.3)
+│   ├── database.pln   — SQLite connection (v0.3)
+│   ├── expressions.pln— Plain Expressions (v1.1)
+│   └── stdlib.pln     — runtime stdlib usage
 │
 ├── tests/
 │   └── compiler.test.js

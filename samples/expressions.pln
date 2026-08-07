@@ -1,0 +1,24 @@
+// Plain v1.1.0 — Plain Expressions
+
+remember players as ["Haaland", "Foden", "Rodri"]
+
+show first player from players
+show last player from players
+show player three from players
+
+add("Palmer" to players)
+show players length
+
+remove("Foden" from players)
+show players length
+
+remember user as
+    name is "Ayokunle"
+    age is 17
+done
+
+show name of user
+name of user becomes "Ayo"
+
+write("Saved by Plain Expressions" to "notes.txt")
+show read("notes.txt")

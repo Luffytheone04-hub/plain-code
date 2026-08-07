@@ -6,7 +6,7 @@
 
   <!-- SEO -->
   <title>Plain — The programming language that reads like English</title>
-  <meta name="description" content="Plain is an Intent-Oriented Programming Language (IOPL). Write programs in near-English sentences and compile them to JavaScript. v1.0.1 — runtime stabilization.">
+  <meta name="description" content="Plain is an Intent-Oriented Programming Language (IOPL). Write programs in near-English sentences and compile them to JavaScript. v1.1.0 — Plain Expressions.">
   <meta name="keywords" content="Plain, IOPL, intent-oriented programming, programming language, JavaScript, Plain language, plain-code, beginner programming language">
   <link rel="canonical" href="https://github.com/ayoistooslick/plain-code">
 
@@ -14,13 +14,13 @@
   <meta property="og:type"        content="website">
   <meta property="og:url"         content="https://ayoistooslick.github.io/plain-code/">
   <meta property="og:title"       content="Plain — The programming language that reads like English">
-  <meta property="og:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.0.1 — runtime stabilization.">
+  <meta property="og:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.1.0 — Plain Expressions.">
   <meta property="og:image"       content="https://github.com/ayoistooslick/plain-code/og.png">
 
   <!-- Twitter Card -->
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:title"       content="Plain — The programming language that reads like English">
-  <meta name="twitter:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.0.1 runtime stabilization.">
+  <meta name="twitter:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.1.0 Plain Expressions.">
   <meta name="twitter:image"       content="https://plain-code.name.ng/og.png">
 
   <!-- Font Awesome -->
@@ -38,7 +38,7 @@
   <div class="nav-inner">
     <a class="nav-logo" href="#top">
       <span class="logo-word">Plain</span>
-      <span class="logo-ver">v1.0.1</span>
+      <span class="logo-ver">v1.1.0</span>
     </a>
 
     <ul class="nav-links" role="list">
@@ -95,7 +95,7 @@
       <div class="hero-copy">
         <div class="hero-badge">
           <i class="fa-solid fa-bolt"></i>
-          v1.0.1 &mdash; Runtime Stabilization
+          v1.1.0 &mdash; Plain Expressions
         </div>
         <h1 class="hero-title">
           The language<br>
@@ -168,7 +168,7 @@
       <div class="stat-label">Keywords</div>
     </div>
     <div class="stat-item">
-      <div class="stat-value">257</div>
+      <div class="stat-value">312</div>
       <div class="stat-label">Tests Passing</div>
     </div>
     <div class="stat-item">
@@ -559,6 +559,57 @@ user.age = <span class="num">18</span>;
 <span class="kw">let</span> scores = [<span class="num">90</span>, <span class="num">85</span>, <span class="num">92</span>];
 console.<span class="fn">log</span>(scores[<span class="num">0</span>]);
 scores[<span class="num">1</span>] = <span class="num">95</span>;</code></pre>
+      </div>
+    </div>
+
+    <!-- Plain Expressions (v1.1) -->
+    <h3 class="sub-heading"><i class="fa-solid fa-language"></i> Plain Expressions <span class="badge badge-blue">v1.1</span></h3>
+    <p style="color:var(--muted);margin-bottom:.75rem">Collections, properties, and files read like sentences. The compiler generates the JavaScript for you.</p>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Plain</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> players <span class="kw">as</span> [<span class="str">"Haaland"</span>, <span class="str">"Foden"</span>, <span class="str">"Rodri"</span>]
+
+<span class="kw">show</span> <span class="kw">first</span> player <span class="kw">from</span> players
+<span class="kw">show</span> <span class="kw">last</span> player <span class="kw">from</span> players
+<span class="kw">show</span> player two <span class="kw">from</span> players
+
+<span class="kw">show</span> players length
+<span class="kw">add</span>(<span class="str">"Palmer"</span> <span class="kw">to</span> players)
+<span class="kw">remove</span>(<span class="str">"Rodri"</span> <span class="kw">from</span> players)
+
+<span class="kw">show</span> name <span class="kw">of</span> user
+name <span class="kw">of</span> user <span class="kw">becomes</span> <span class="str">"Ayo"</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">JavaScript</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">let</span> players = [<span class="str">"Haaland"</span>, <span class="str">"Foden"</span>, <span class="str">"Rodri"</span>];
+
+console.<span class="fn">log</span>(players[<span class="num">0</span>]);
+console.<span class="fn">log</span>(players[players.length <span class="op">-</span> <span class="num">1</span>]);
+console.<span class="fn">log</span>(players[<span class="num">1</span>]);
+
+console.<span class="fn">log</span>(players.length);
+players.<span class="fn">push</span>(<span class="str">"Palmer"</span>);
+players.<span class="fn">splice</span>(players.<span class="fn">indexOf</span>(<span class="str">"Rodri"</span>), <span class="num">1</span>);
+
+console.<span class="fn">log</span>(user.name);
+user.name = <span class="str">"Ayo"</span>;</code></pre>
+      </div>
+    </div>
+    <div class="callout callout-info">
+      <i class="fa-solid fa-circle-info"></i>
+      <div class="callout-body">
+        <strong>How it works</strong>
+        <p>Number words <code>one</code> through <code>twenty</code> pick items by position: <code>player one from players</code> is the first player. <code>of</code> chains right-to-left, so <code>city of address of customer</code> reads <code>customer.address.city</code>. Files use <code>read("users.txt")</code> and <code>write(data to "users.txt")</code>. All v1.0 syntax still works.</p>
       </div>
     </div>
 
@@ -1449,7 +1500,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.</code></pre>
   <div class="footer-bottom">
     <p>Copyright &copy; 2026 Ayokunle. Released under the MIT License.</p>
     <span class="badge badge-blue version-badge">
-      <i class="fa-solid fa-bolt"></i> Plain v1.0.1
+      <i class="fa-solid fa-bolt"></i> Plain v1.1.0
     </span>
   </div>
 </footer>

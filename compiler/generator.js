@@ -30,6 +30,7 @@ const STDLIB = {
   readFile:   (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   writeFile:  (args, context) => `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
   fileExists: (args, context) => `fs.existsSync(${generateExpr(args[0], context)})`,
+  read:       (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
   sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
@@ -231,6 +232,10 @@ function generateLValue(node, context) {
   if (node.type === 'Identifier')       return node.name;
   if (node.type === 'IndexExpression')  return `${generateExpr(node.object, context)}[${generateExpr(node.index, context)}]`;
   if (node.type === 'MemberExpression') return `${generateExpr(node.object, context)}.${node.property}`;
+  if (node.type === 'OfExpression')     return `${generateExpr(node.object, context)}.${generateExpr(node.property, context)}`;
+  if (node.type === 'FirstItem')        return `${generateExpr(node.collection, context)}[0]`;
+  if (node.type === 'NumberedItem')     return `${generateExpr(node.collection, context)}[${node.index}]`;
+  if (node.type === 'LastItem')         return `${generateExpr(node.collection, context)}[${generateExpr(node.collection, context)}.length - 1]`;
   throw new Error(`Invalid assignment target "${node.type}".`);
 }
 
@@ -266,7 +271,8 @@ function generateExpr(node, context = createGenerationContext()) {
 
     case 'CallExpression': {
       if (STDLIB[node.name]) {
-        if (node.name === 'readFile' || node.name === 'writeFile' || node.name === 'fileExists') {
+        if (node.name === 'readFile' || node.name === 'writeFile' ||
+            node.name === 'fileExists' || node.name === 'read') {
           ensureBuiltin(context, 'fs');
         } else if (node.name === 'uuid') {
           ensureBuiltin(context, 'crypto');
@@ -275,6 +281,34 @@ function generateExpr(node, context = createGenerationContext()) {
       }
       return `${node.name}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
     }
+
+    // v1.1 — Item expressions
+    case 'FirstItem':
+      return `${generateExpr(node.collection, context)}[0]`;
+
+    case 'LastItem':
+      return `${generateExpr(node.collection, context)}[${generateExpr(node.collection, context)}.length - 1]`;
+
+    case 'NumberedItem':
+      return `${generateExpr(node.collection, context)}[${node.index}]`;
+
+    case 'LengthExpression':
+      return `${generateExpr(node.object, context)}.length`;
+
+    // v1.1 — Property access
+    case 'OfExpression':
+      return `${generateExpr(node.object, context)}.${generateExpr(node.property, context)}`;
+
+    // v1.1 — Collection operations
+    case 'AddCall':
+      return `${generateExpr(node.collection, context)}.push(${generateExpr(node.value, context)})`;
+
+    case 'RemoveCall':
+      return `${generateExpr(node.collection, context)}.splice(${generateExpr(node.collection, context)}.indexOf(${generateExpr(node.value, context)}), 1)`;
+
+    case 'WriteCall':
+      ensureBuiltin(context, 'fs');
+      return `fs.writeFileSync(${generateExpr(node.data, context)}, ${generateExpr(node.file, context)}, 'utf8')`;
 
     default:
       throw new Error(`Unknown expression type "${node.type}".`);

@@ -1129,9 +1129,9 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.0.1', () => {
+test('plain version shows 1.1.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.1')) throw new Error(`Expected version 1.0.1 but got: ${out}`);
+  if (!out.includes('1.1.0')) throw new Error(`Expected version 1.1.0 but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
@@ -1399,9 +1399,9 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.0.1', () => {
+test('plain version shows 1.1.0', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.1')) throw new Error(`Expected version 1.0.1 but got: ${out}`);
+  if (!out.includes('1.1.0')) throw new Error(`Expected version 1.1.0 but got: ${out}`);
 });
 
 // ── v0.6 — Extended comparisons ──────────────────────────────────────────────
@@ -1766,14 +1766,19 @@ test('"execute" block compiles to db.exec()', () => {
 
 console.log('\nv0.6 — CLI updates');
 
-test('plain version shows 1.0.1 (CLI)', () => {
+test('plain version shows 1.1.0 (CLI)', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.1')) throw new Error(`Expected 1.0.1 but got: ${out}`);
+  if (!out.includes('1.1.0')) throw new Error(`Expected 1.1.0 but got: ${out}`);
 });
 
 test('plain help mentions v1.0 features', () => {
   const out = runCli(['help'], process.cwd());
   if (!out.includes('1.0')) throw new Error('"1.0" missing from help');
+});
+
+test('plain help mentions v1.1 Plain Expressions', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('Plain Expressions')) throw new Error('"Plain Expressions" missing from help');
 });
 
 test('plain help includes "route"', () => {
@@ -2090,6 +2095,315 @@ test('between condition in while loop', () => {
   const src = 'remember x as 5\nif x between 1 and 10\n  show "in range"\ndone';
   const js = compile(src);
   if (!js.includes('x >= 1 && x <= 10')) throw new Error('expected between range');
+});
+
+// ── RFC-0010 — Plain Expressions (v1.1) ─────────────────────────────────────
+
+console.log('\nRFC-0010 — Plain Expressions (v1.1)');
+
+test('first player from players compiles to index 0', () => {
+  assert(compile('show first player from players'), 'console.log(players[0]);');
+});
+
+test('last player from players compiles to last index', () => {
+  assert(compile('show last player from players'), 'console.log(players[players.length - 1]);');
+});
+
+test('player one from players compiles to index 0 (one-based words)', () => {
+  assert(compile('show player one from players'), 'console.log(players[0]);');
+});
+
+test('player four from players compiles to index 3', () => {
+  assert(compile('show player four from players'), 'console.log(players[3]);');
+});
+
+test('player twenty from players compiles to index 19', () => {
+  assert(compile('show player twenty from players'), 'console.log(players[19]);');
+});
+
+test('all twenty number words compile to one-based indexes', () => {
+  const words = ['one','two','three','four','five','six','seven','eight','nine',
+    'ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen',
+    'eighteen','nineteen','twenty'];
+  words.forEach((word, i) => {
+    const js = compile(`show player ${word} from players`);
+    if (!js.includes(`players[${i}]`)) {
+      throw new Error(`"player ${word}" should compile to players[${i}] but got: ${js}`);
+    }
+  });
+});
+
+test('item expression works with any noun', () => {
+  assert(compile('show first item from items'), 'console.log(items[0]);');
+});
+
+test('item expression works with an array literal collection', () => {
+  assert(compile('show first item from ["a", "b"]'), 'console.log(["a", "b"][0]);');
+});
+
+test('item expression works with a member access collection', () => {
+  assert(compile('show first item from team.players'), 'console.log(team.players[0]);');
+});
+
+test('item expression in a condition', () => {
+  const js = compile('if first player from players is "Ayo"\n  show "yes"\ndone');
+  if (!js.includes('players[0] === "Ayo"')) throw new Error('expected index condition');
+});
+
+test('item expression in arithmetic', () => {
+  assert(compile('show first score from scores + 10'), 'console.log(scores[0] + 10);');
+});
+
+test('item expression as an assignment target', () => {
+  assert(compile('first player from players becomes "Ayo"'), 'players[0] = "Ayo";');
+});
+
+test('numbered item expression as an assignment target', () => {
+  assert(compile('player two from players becomes "Bola"'), 'players[1] = "Bola";');
+});
+
+test('last item expression as an assignment target', () => {
+  assert(compile('last player from players becomes "Zed"'), 'players[players.length - 1] = "Zed";');
+});
+
+test('of-expression combining with an item expression', () => {
+  assert(compile('show name of first player from players'), 'console.log(players[0].name);');
+});
+
+test('players length compiles to .length', () => {
+  assert(compile('show players length'), 'console.log(players.length);');
+});
+
+test('length of players compiles to .length (of form)', () => {
+  assert(compile('show length of players'), 'console.log(players.length);');
+});
+
+test('length in a condition', () => {
+  const js = compile('if players length is 3\n  show "three"\ndone');
+  if (!js.includes('players.length === 3')) throw new Error('expected length condition');
+});
+
+test('length works on a member expression', () => {
+  assert(compile('show team.players length'), 'console.log(team.players.length);');
+});
+
+test('name of user compiles to property access', () => {
+  assert(compile('show name of user'), 'console.log(user.name);');
+});
+
+test('name of user becomes compiles to assignment', () => {
+  assert(compile('name of user becomes "Ayo"'), 'user.name = "Ayo";');
+});
+
+test('of-expression is right-associative', () => {
+  assert(compile('show city of address of customer'), 'console.log(customer.address.city);');
+});
+
+test('nested of-expression becomes compiles to nested assignment', () => {
+  assert(compile('city of address of customer becomes "Lagos"'), 'customer.address.city = "Lagos";');
+});
+
+test('of-expression as a collection operation argument', () => {
+  assert(compile('add(name of user to names)'), 'names.push(user.name);');
+});
+
+test('of-expression as a function argument', () => {
+  assert(compile('greet(name of user)'), 'greet(user.name);');
+});
+
+test('of-expression object can be an indexed value', () => {
+  assert(compile('show name of users[0]'), 'console.log(users[0].name);');
+});
+
+test('of-expression errors when the left side is not a property word', () => {
+  try {
+    compile('show 5 of user');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a property name before "of"')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('add(item to collection) compiles to push', () => {
+  assert(compile('add(player to players)'), 'players.push(player);');
+});
+
+test('remove(item from collection) compiles to splice', () => {
+  assert(compile('remove(player from players)'), 'players.splice(players.indexOf(player), 1);');
+});
+
+test('add with a literal value', () => {
+  assert(compile('add("Ayo" to players)'), 'players.push("Ayo");');
+});
+
+test('add with an item expression value', () => {
+  assert(compile('add(first player from players to team)'), 'team.push(players[0]);');
+});
+
+test('remove with a property expression value', () => {
+  assert(compile('remove(name of user from names)'), 'names.splice(names.indexOf(user.name), 1);');
+});
+
+test('remove with an item expression value', () => {
+  assert(compile('remove(last player from players)'),
+    'players.splice(players.indexOf(players[players.length - 1]), 1);');
+});
+
+test('remove with a numbered item value', () => {
+  assert(compile('remove(player one from players)'), 'players.splice(players.indexOf(players[0]), 1);');
+});
+
+test('add works inside a for each loop', () => {
+  const js = compile('for each item in items\n  add(item to seen)\ndone');
+  if (!js.includes('seen.push(item)')) throw new Error('missing push in loop body');
+});
+
+test('add is still usable as a user function name (backward compat)', () => {
+  const js = compile('make add(a, b)\n  give a + b\ndone\nshow add(2, 3)');
+  if (!js.includes('function add(a, b)')) throw new Error('missing function declaration');
+  if (!js.includes('add(2, 3)')) throw new Error('missing normal call');
+});
+
+test('length is still usable as a function (backward compat)', () => {
+  assert(compile('show length(players)'), 'console.log((players).length);');
+});
+
+test('unknown special call form throws a helpful error', () => {
+  try {
+    compile('frobnicate(a to b)');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('not a valid Plain collection expression')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('contains compiles to includes (pre-existing v0.6)', () => {
+  const js = compile('if players contains "Ayo"\n  show "found"\ndone');
+  if (!js.includes('(players).includes("Ayo")')) throw new Error('expected includes');
+});
+
+test('contains works with a property expression', () => {
+  const js = compile('if names contains name of user\n  show "found"\ndone');
+  if (!js.includes('includes(user.name)')) throw new Error('expected includes with property');
+});
+
+test('read compiles to readFileSync with an fs prelude', () => {
+  const js = compile('show read("users.txt")');
+  if (!js.includes(`const fs = require('fs');`)) throw new Error('missing fs prelude');
+  if (!js.includes(`fs.readFileSync("users.txt", 'utf8')`)) throw new Error('missing readFileSync');
+});
+
+test('read works with a variable path', () => {
+  const js = compile('show read(filePath)');
+  if (!js.includes(`fs.readFileSync(filePath, 'utf8')`)) throw new Error('missing readFileSync');
+});
+
+test('write(data to file) compiles to writeFileSync with an fs prelude', () => {
+  const js = compile('write("hello" to "out.txt")');
+  if (!js.includes(`const fs = require('fs');`)) throw new Error('missing fs prelude');
+  if (!js.includes(`fs.writeFileSync("hello", "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+});
+
+test('write works with a variable payload', () => {
+  const js = compile('write(data to "out.txt")');
+  if (!js.includes(`fs.writeFileSync(data, "out.txt", 'utf8')`)) throw new Error('missing writeFileSync');
+});
+
+test('readFile remains available (backward compat)', () => {
+  const js = compile('show readFile("x.txt")');
+  if (!js.includes(`fs.readFileSync("x.txt", 'utf8')`)) throw new Error('missing readFileSync');
+});
+
+test('read result feeds other stdlib functions', () => {
+  const js = compile('show uppercase(read("notes.txt"))');
+  if (!js.includes(`(fs.readFileSync("notes.txt", 'utf8')).toUpperCase()`)) {
+    throw new Error(`missing nested read: ${js}`);
+  }
+});
+
+test('first from players errors with a missing-noun hint', () => {
+  try {
+    compile('first from players');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a noun after "first"')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('last from players errors with a missing-noun hint', () => {
+  try {
+    compile('show last from players');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a noun after "last"')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('non-number word before "from" errors with a number-word hint', () => {
+  try {
+    compile('show player banana from players');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a number word after "player" before "from"')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('number words beyond twenty are rejected', () => {
+  try {
+    compile('show player twentyone from players');
+    throw new Error('expected an error but none was thrown');
+  } catch (e) {
+    if (!e.message.includes('Expected a number word')) {
+      throw new Error(`unexpected message: ${e.message}`);
+    }
+  }
+});
+
+test('expressions compose in consecutive statements', () => {
+  const js = compile('remember p as first player from players\nshow p length');
+  if (!js.includes('let p = players[0]')) throw new Error('missing item remember');
+  if (!js.includes('console.log(p.length)')) throw new Error('missing length');
+});
+
+test('expressions work inside while loops', () => {
+  const js = compile('while players length is above 0\n  remove(last player from players)\ndone');
+  if (!js.includes('while (players.length > 0)')) throw new Error('expected while condition');
+  if (!js.includes('players.splice(players.indexOf(players[players.length - 1]), 1)')) {
+    throw new Error('expected remove in loop body');
+  }
+});
+
+test('expressions work inside functions', () => {
+  const js = compile('make pick()\n  give first player from players\ndone');
+  if (!js.includes('return players[0];')) throw new Error('expected return item');
+});
+
+test('expressions work across if-otherwise branches', () => {
+  const js = compile('if players contains "Ayo"\n  show "yes"\notherwise\n  add("Ayo" to players)\ndone');
+  if (!js.includes('(players).includes("Ayo")')) throw new Error('expected condition');
+  if (!js.includes('players.push("Ayo")')) throw new Error('expected add in otherwise');
+});
+
+test('legacy array index syntax still works', () => {
+  assert(compile('show players[0]'), 'console.log(players[0]);');
+});
+
+test('format: preserves plain expressions', () => {
+  const src = 'show first player from players\nadd(player to players)\nshow name of user';
+  const result = format(src);
+  if (!result.includes('first player from players')) throw new Error('item expression changed');
+  if (!result.includes('add(player to players)')) throw new Error('collection expression changed');
+  if (!result.includes('name of user')) throw new Error('of-expression changed');
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────
