@@ -1,0 +1,34 @@
+{
+    // 语法名称和关联的文件扩展名
+    name: ["Plain", ".pln"]
+
+    // 行注释配置（Plain 语言使用 # 和 //）
+    comment: {startsWith: "#"}
+    comment: {startsWith: "//"}
+
+    // 主要匹配规则
+    contains: [
+        // 多词关键字（必须放在单词关键字之前，避免被截断）
+        {match: /\b(is\s+not)\b/, 0: "keyword"},
+        {match: /\b(starts\s+with)\b/, 0: "keyword"},
+        {match: /\b(ends\s+with)\b/, 0: "keyword"},
+        {match: /\b(at\s+least)\b/, 0: "keyword"},
+        {match: /\b(at\s+most)\b/, 0: "keyword"},
+
+        // 布尔值和空常量
+        {match: keywordsToRegex("true false nothing"), 0: "constant"},
+
+        // 单词关键字
+        {match: keywordsToRegex(
+            "remember as becomes make give if otherwise while for each every in done"
+            "show use web app route reply start database query execute insert update delete"
+            "is contains between above below empty"
+        ), 0: "keyword"},
+
+        // 数字（十进制、十六进制、浮点、科学计数、支持 _ 分隔）
+        {number: "10|16|F|E|_"},
+
+        // 字符串（单引号和双引号，自动处理转义）
+        {builtin: #QUOTED_STRING#}
+    ]
+}
