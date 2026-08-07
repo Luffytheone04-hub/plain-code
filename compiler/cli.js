@@ -8,7 +8,7 @@
 //   plain fmt    <file.pln>   format a Plain file in-place
 //   plain new    [name]       scaffold a new Plain project
 //   plain init               create plain.json in the current directory
-//   plain install            install dependencies from plain.json
+//   plain install            install dependencies required by the project's source files
 //   plain add    <package>   install a package and add it to plain.json
 //   plain remove <package>   uninstall a package and remove it from plain.json
 //   plain update             update all installed packages
@@ -52,7 +52,7 @@ Commands
   plain fmt    <file.pln>   Format a Plain file in-place
   plain new    [name]       Create a new Plain project
   plain init               Create a plain.json in the current directory
-  plain install            Install dependencies listed in plain.json
+  plain install            Install dependencies required by the project's source files
   plain add    <package>   Install a package and add it to plain.json
   plain remove <package>   Remove a package from plain.json and uninstall it
   plain update             Update all installed npm packages
@@ -322,29 +322,81 @@ function cmdInit() {
   console.log(`✓ Created ${PLAIN_JSON}`);
 }
 
+// ── NEW plain install implementation (RFC-0009.2) ──────────────────────────
+
 function cmdInstall() {
   const config = readPlainJson();
   if (!config) {
     console.error(`No ${PLAIN_JSON} found. Run "plain init" first.`);
     process.exit(1);
   }
-  const deps = config.dependencies || {};
-  const packages = Object.keys(deps);
-  if (packages.length === 0) {
-    console.log('No dependencies to install.');
-    return;
-  }
-  // Install every package declared in plain.json.dependencies by name,
-  // so this works even in projects that have no package.json yet.
-  console.log('Installing dependencies...');
-  try {
-    execFileSync('npm', ['install', ...packages], { stdio: 'inherit', cwd: process.cwd() });
-    console.log('\n✓ Dependencies installed.');
-  } catch (e) {
-    console.error('npm install failed.');
+
+  const entry = config.entry || 'app.pln';
+  const entryPath = path.resolve(entry);
+  if (!fs.existsSync(entryPath)) {
+    console.error(`Entry file "${entry}" not found.`);
     process.exit(1);
   }
+
+  console.log('Checking project...');
+  let files;
+  try {
+    files = resolveDependencies(entryPath);
+  } catch (err) {
+    console.error(`Failed to resolve dependencies: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log('Scanning source files...');
+  // Collect all required npm packages
+  const packageSet = new Set();
+  for (const file of files) {
+    const used = getUsedPackages(file.ast);
+    for (const plainPkg of used) {
+      const npm = npmNameFor(plainPkg);
+      if (!isBuiltin(npm)) {
+        packageSet.add(npm);
+      }
+    }
+  }
+
+  const requiredPackages = [...packageSet];
+  if (requiredPackages.length === 0) {
+    console.log('This project has no external dependencies.');
+    return;
+  }
+
+  // Determine which are missing
+  const missing = [];
+  for (const pkg of requiredPackages) {
+    if (!isInstalled(pkg)) {
+      missing.push(pkg);
+    }
+  }
+
+  if (missing.length === 0) {
+    console.log('All dependencies are already installed.');
+    return;
+  }
+
+  console.log(`Found ${requiredPackages.length} required package(s).`);
+  console.log(`Installing ${missing.length} missing package(s)...`);
+
+  // Install each missing package
+  for (const pkg of missing) {
+    console.log(`Installing ${pkg}...`);
+    try {
+      execFileSync('npm', ['install', pkg], { stdio: 'inherit', cwd: process.cwd() });
+    } catch (e) {
+      console.error(`Failed to install "${pkg}".`);
+      process.exit(1);
+    }
+  }
+
+  console.log('Done.');
 }
+
+// ── end of new cmdInstall ──────────────────────────────────────────────────
 
 function cmdAdd(packageName) {
   if (!packageName) {

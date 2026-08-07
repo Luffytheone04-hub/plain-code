@@ -1,3 +1,4 @@
+
 // Runtime dependency detection for Plain source files.
 //
 // This module only inspects source/AST data. It never installs packages or
@@ -29,7 +30,12 @@ function visit(node, onUse) {
     return;
   }
 
-  if (node.type === 'UseStatement') onUse(node.module);
+  if (node.type === 'UseStatement') {
+    onUse(node.module);
+  } else if (node.type === 'DatabaseStatement') {
+    // The `database` shorthand uses `better-sqlite3` under the hood.
+    onUse('sqlite');
+  }
 
   for (const value of Object.values(node)) {
     if (value && typeof value === 'object') visit(value, onUse);
@@ -37,7 +43,8 @@ function visit(node, onUse) {
 }
 
 /**
- * Return the unique npm packages required by Plain `use` statements.
+ * Return the unique npm packages required by Plain `use` statements
+ * and `database` shorthand blocks.
  *
  * @param {string|object} source Plain source text or a parsed Plain AST
  * @returns {string[]} package names in first-seen order
@@ -54,6 +61,20 @@ function detectDependencies(source) {
       dependencies.add(packageName);
     }
   });
+
+  // Additional check for the `database "..."` shorthand when the source is a string.
+  // This ensures detection even if the parser does not produce a DatabaseStatement node.
+  if (typeof source === 'string') {
+    // Look for patterns like: database "file.db" or database 'file.db'
+    // We use a simple regex to catch the shorthand.
+    if (/database\s+["']/.test(source)) {
+      const moduleName = 'sqlite';
+      const packageName = PACKAGE_MAP[moduleName] || moduleName;
+      if (!isBuiltinModule(moduleName) && !isBuiltinModule(packageName)) {
+        dependencies.add(packageName);
+      }
+    }
+  }
 
   return [...dependencies];
 }

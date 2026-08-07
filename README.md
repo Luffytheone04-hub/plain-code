@@ -18,7 +18,7 @@ plain run app.pln
 
 ---
 
-## CLI
+CLI
 
 ```
 plain run    <file.pln>   Compile and execute a Plain program
@@ -27,7 +27,7 @@ plain check  <file.pln>   Check syntax only (no output, no execution)
 plain fmt    <file.pln>   Format a Plain file in-place
 plain new    [name]       Create a new Plain project
 plain init               Create a plain.json in the current directory
-plain install            Install dependencies listed in plain.json
+plain install            Install dependencies required by the project's source files
 plain add    <package>   Install a package and add it to plain.json
 plain remove <package>   Remove a package from plain.json and uninstall it
 plain update             Update all installed npm packages
@@ -37,9 +37,9 @@ plain help               Print help text
 
 ---
 
-## Language features
+Language features
 
-### Variables
+Variables
 
 ```plain
 remember name as "Ayokunle"
@@ -47,7 +47,7 @@ remember age as 16
 age becomes 17
 ```
 
-### Conditions (v0.6 comparisons)
+Conditions (v0.6 comparisons)
 
 ```plain
 if age is at least 18
@@ -67,22 +67,21 @@ done
 
 All comparison operators:
 
-| Plain                   | JavaScript        |
-|-------------------------|-------------------|
-| `is` / `is equal to`    | `===`             |
-| `is not`                | `!==`             |
-| `is greater than` / `is above` | `>`      |
-| `is less than` / `is below`    | `<`      |
-| `is at least`           | `>=`              |
-| `is at most`            | `<=`              |
-| `is empty`              | `.length === 0`   |
-| `is not empty`          | `.length > 0`     |
-| `contains "x"`          | `.includes("x")`  |
-| `starts with "x"`       | `.startsWith("x")`|
-| `ends with "x"`         | `.endsWith("x")`  |
-| `between A and B`       | `>= A && <= B`    |
-
-### Functions
+Plain JavaScript
+is / is equal to ===
+is not !==
+is greater than / is above >
+is less than / is below <
+is at least >=
+is at most <=
+is empty .length === 0
+is not empty .length > 0
+contains "x" .includes("x")
+starts with "x" .startsWith("x")
+ends with "x" .endsWith("x")
+between A and B >= A && <= B
+# =>
+Functions
 
 ```plain
 make add(a, b)
@@ -91,7 +90,7 @@ done
 show add(5, 7)
 ```
 
-### Arrays & Objects
+Arrays & Objects
 
 ```plain
 remember players as ["Haaland", "Foden", "Rodri"]
@@ -105,7 +104,7 @@ done
 show user.name
 ```
 
-### Loops
+Loops
 
 ```plain
 for each player in players
@@ -121,39 +120,38 @@ while age is less than 18
 done
 ```
 
-### Runtime Standard Library (v0.6)
+Runtime Standard Library (v0.6)
 
 No imports needed. These functions are built into the compiler:
 
-| Plain                      | Description                          |
-|----------------------------|--------------------------------------|
-| `print(x)`                 | Print a value (`console.log`)        |
-| `readFile("path")`         | Read a file as UTF-8 text            |
-| `writeFile("path", data)`  | Write text to a file                 |
-| `fileExists("path")`       | Check if a file exists               |
-| `sleep(ms)`                | Sleep synchronously                  |
-| `time()`                   | Current Unix timestamp (`Date.now()`) |
-| `date()`                   | ISO date string                      |
-| `jsonEncode(value)`        | `JSON.stringify`                     |
-| `jsonDecode(string)`       | `JSON.parse`                         |
-| `env("KEY")`               | Read environment variable            |
-| `exit(code)`               | Exit the process                     |
-| `uuid()`                   | Generate a UUID v4                   |
-| `length(x)`                | Length of array/string               |
-| `uppercase(x)`             | Convert to uppercase                 |
-| `lowercase(x)`             | Convert to lowercase                 |
-| `random()`                 | Random number 0–1                    |
-| `round(x)`                 | Round to nearest integer             |
+Plain Description
+print(x) Print a value (console.log)
+readFile("path") Read a file as UTF-8 text
+writeFile("path", data) Write text to a file
+fileExists("path") Check if a file exists
+sleep(ms) Sleep synchronously
+time() Current Unix timestamp (Date.now())
+date() ISO date string
+jsonEncode(value) JSON.stringify
+jsonDecode(string) JSON.parse
+env("KEY") Read environment variable
+exit(code) Exit the process
+uuid() Generate a UUID v4
+length(x) Length of array/string
+uppercase(x) Convert to uppercase
+lowercase(x) Convert to lowercase
+random() Random number 0–1
+round(x) Round to nearest integer
 
 ---
 
-## Project management (v0.4.2)
+Project management (v0.4.2)
 
 Plain can manage its own project configuration without relying on npm for everything.
 
-### plain init
+plain init
 
-Create a `plain.json` in the current directory:
+Create a plain.json in the current directory:
 
 ```bash
 plain init
@@ -169,34 +167,46 @@ Generates:
 }
 ```
 
-If `plain.json` already exists, Plain prints `Project already initialized.` and does nothing.
+If plain.json already exists, Plain prints Project already initialized. and does nothing.
 
-### plain install
+plain install
 
-Install all dependencies listed in `plain.json`:
+Install all npm packages required by your project's source files. Plain scans all .pln files, detects use statements, and installs any missing packages.
 
 ```bash
 plain install
 ```
 
-### plain add
+If no external dependencies are found, it prints:
 
-Install a package and record it in `plain.json`:
+```
+This project has no external dependencies.
+```
+
+If all dependencies are already installed, it prints:
+
+```
+All dependencies are already installed.
+```
+
+plain add
+
+Install a package and record it in plain.json:
 
 ```bash
 plain add express
 plain add better-sqlite3
 ```
 
-### plain remove
+plain remove
 
-Uninstall a package and remove it from `plain.json`:
+Uninstall a package and remove it from plain.json:
 
 ```bash
 plain remove express
 ```
 
-### plain update
+plain update
 
 Update all installed npm packages:
 
@@ -204,9 +214,9 @@ Update all installed npm packages:
 plain update
 ```
 
-### Dependency validation
+Dependency validation
 
-Before compiling, Plain checks that every package referenced by `use` is installed.
+Before compiling, Plain checks that every package referenced by use is installed.
 If a package is missing, you see a friendly error:
 
 ```
@@ -214,25 +224,24 @@ Package "express" is not installed.
 Run: plain add express
 ```
 
-### Runtime dependency detection
+Runtime dependency detection
 
 Plain can inspect a source file and list the npm packages it needs without
-installing anything. The reusable detector scans `use` statements, maps Plain
-module names to their npm packages, ignores Node built-ins such as `fs` and
-`path`, and removes duplicates.
+installing anything. The reusable detector scans use statements, maps Plain
+module names to their npm packages, ignores Node built-ins such as fs and
+path, and removes duplicates.
 
 The current mappings include:
 
-| Plain module | npm package |
-|--------------|-------------|
-| `express`    | `express`   |
-| `sqlite`     | `better-sqlite3` |
+Plain module npm package
+express express
+sqlite better-sqlite3
 
 ---
 
-## Web Apps (v0.6)
+Web Apps (v0.6)
 
-The `web app` shorthand sets up Express with less boilerplate:
+The web app shorthand sets up Express with less boilerplate:
 
 ```plain
 web app
@@ -251,13 +260,13 @@ done
 start 3000
 ```
 
-The classic `use express` / `when someone visits` style still works alongside the new syntax.
+The classic use express / when someone visits style still works alongside the new syntax.
 
 ---
 
-## SQLite Database (v0.6)
+SQLite Database (v0.6)
 
-Inline SQL blocks compile directly to `better-sqlite3` calls:
+Inline SQL blocks compile directly to better-sqlite3 calls:
 
 ```plain
 database "app.db"
@@ -275,20 +284,19 @@ remember rows as query
 done
 ```
 
-| Plain          | Compiles to                     |
-|----------------|---------------------------------|
-| `database "f"` | `const db = new Database("f")`  |
-| `query … done` | `db.prepare(\`…\`).all()`       |
-| `insert … done`| `db.prepare(\`…\`).run()`       |
-| `update … done`| `db.prepare(\`…\`).run()`       |
-| `delete … done`| `db.prepare(\`…\`).run()`       |
-| `execute … done`| `db.exec(\`…\`)`               |
+Plain Compiles to
+database "f" const db = new Database("f")
+query … done db.prepare(\…`).all()`
+insert … done db.prepare(\…`).run()`
+update … done db.prepare(\…`).run()`
+delete … done db.prepare(\…`).run()`
+execute … done db.exec(\…`)`
 
 ---
 
-## Multi-file projects (v0.4.1)
+Multi-file projects (v0.4.1)
 
-Split your code across multiple `.pln` files using `import`:
+Split your code across multiple .pln files using import:
 
 ```plain
 import "./math.pln"
@@ -299,14 +307,15 @@ show double(5)
 ```
 
 Rules:
-- Paths must be relative (`./` or `../`)
-- Files compile in dependency order (deepest dependency first)
-- Duplicate imports are de-duplicated automatically
-- Circular imports produce a friendly compiler error
+
+· Paths must be relative (./ or ../)
+· Files compile in dependency order (deepest dependency first)
+· Duplicate imports are de-duplicated automatically
+· Circular imports produce a friendly compiler error
 
 ---
 
-## Express server (v0.3)
+Express server (v0.3)
 
 ```plain
 use express
@@ -331,11 +340,11 @@ listen on 3000
 done
 ```
 
-Inside route bodies, `request` maps to `req` and `response` maps to `res`.
+Inside route bodies, request maps to req and response maps to res.
 
 ---
 
-## SQLite (v0.3)
+SQLite (v0.3)
 
 ```plain
 use sqlite
@@ -345,20 +354,19 @@ remember db as sqlite("database.db")
 
 ---
 
-## Supported packages
+Supported packages
 
-| Plain          | Compiles to                              |
-|----------------|------------------------------------------|
-| `use express`  | `const express = require('express');`    |
-| `use sqlite`   | `const Database = require('better-sqlite3');` |
-| `use fs`       | `const fs = require('fs');`              |
-| `use path`     | `const path = require('path');`          |
+Plain Compiles to
+use express const express = require('express');
+use sqlite const Database = require('better-sqlite3');
+use fs const fs = require('fs');
+use path const path = require('path');
 
 Unknown packages produce a friendly compiler error.
 
 ---
 
-## Running the tests
+Running the tests
 
 ```bash
 npm test
@@ -366,7 +374,7 @@ npm test
 
 ---
 
-## Project structure
+Project structure
 
 ```
 Plain/

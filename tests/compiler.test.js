@@ -81,6 +81,10 @@ test('returns an empty list for a project without use statements', () => {
   assert(JSON.stringify(detectDependencies('show "Hello"')), '[]');
 });
 
+test('detects better-sqlite3 from database shorthand', () => {
+  assert(JSON.stringify(detectDependencies('database "app.db"')), '["better-sqlite3"]');
+});
+
 // ── Lexer ────────────────────────────────────────────────────────────────────
 
 console.log('\nLexer');
@@ -980,7 +984,7 @@ test('plain remove rejects invalid package name', () => {
   }
 });
 
-console.log('\nv0.4.2 — plain install');
+console.log('\nv0.4.2 — plain install (RFC-0009.2)');
 
 test('plain install errors without plain.json', () => {
   const dir = tmpDir();
@@ -990,81 +994,104 @@ test('plain install errors without plain.json', () => {
   }
 });
 
-test('plain install with no dependencies says nothing to install', () => {
+test('plain install with no external dependencies shows correct message', () => {
   const dir = tmpDir();
   runCli(['init'], dir);
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'show "hello"\n');
   const out = runCli(['install'], dir);
-  if (!out.includes('No dependencies to install.')) {
-    throw new Error(`Expected "No dependencies to install." but got: ${out}`);
+  if (!out.includes('This project has no external dependencies.')) {
+    throw new Error(`Expected "This project has no external dependencies." but got: ${out}`);
   }
 });
 
-test('plain install with listed dependencies invokes npm with those packages', () => {
-  // Write a plain.json with a dependency and run plain install.
-  // We verify: (a) the CLI does NOT say "No dependencies to install." —
-  // meaning it tried to install them, and (b) the output includes "Installing".
-  // We use "semver" (a package npm itself uses, likely already in cache).
+test('plain install with built-in modules only shows no external dependencies', () => {
   const dir = tmpDir();
   runCli(['init'], dir);
-  // Manually add a dep to plain.json
-  const jsonPath = path.join(dir, 'plain.json');
-  const config = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  config.dependencies = { semver: '*' };
-  fs.writeFileSync(jsonPath, JSON.stringify(config, null, 4) + '\n');
-  const out = runCli(['install'], dir);
-  // The CLI should have printed "Installing dependencies..." (not "No dependencies")
-  if (out.includes('No dependencies to install.')) {
-    throw new Error('plain install incorrectly skipped declared dependencies');
-  }
-  if (!out.toLowerCase().includes('installing')) {
-    throw new Error(`Expected "Installing" in output but got: ${out}`);
-  }
-});
-
-console.log('\nv0.4.2 — Dependency validation');
-
-test('dependency validation passes for built-in packages (fs, path)', () => {
-  // fs and path are Node built-ins — must never be flagged as missing.
-  const dir = tmpDir();
   const plnFile = path.join(dir, 'app.pln');
   fs.writeFileSync(plnFile, 'use fs\nuse path\nshow "ok"\n');
-  const out = runCli(['build', plnFile], dir);
-  if (out.includes('is not installed')) {
-    throw new Error(`Built-in packages should not fail validation. Got: ${out}`);
+  const out = runCli(['install'], dir);
+  if (!out.includes('This project has no external dependencies.')) {
+    throw new Error(`Expected "This project has no external dependencies." but got: ${out}`);
   }
 });
 
-test('dependency validation emits friendly error for uninstalled npm package', () => {
-  // Use express (a known Plain package) in a clean temp dir where it is NOT installed.
-  // plain build should stop with a friendly "is not installed" message.
+test('plain install installs missing dependencies and reports success', () => {
   const dir = tmpDir();
+  runCli(['init'], dir);
   const plnFile = path.join(dir, 'app.pln');
-  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
-  const out = runCli(['build', plnFile], dir);
-  if (!out.includes('is not installed')) {
-    throw new Error(`Expected "is not installed" error for missing express. Got: ${out}`);
+  fs.writeFileSync(plnFile, 'use semver\nshow "ok"\n');
+  const out = runCli(['install'], dir);
+  // Check that it found and installed the package
+  if (!out.includes('Found 1 required package(s).')) {
+    throw new Error(`Expected "Found 1 required package(s)." but got: ${out}`);
+  }
+  if (!out.includes('Installing semver...')) {
+    throw new Error(`Expected "Installing semver..." but got: ${out}`);
+  }
+  if (!out.includes('Done.')) {
+    throw new Error(`Expected "Done." but got: ${out}`);
+  }
+  // Verify package is actually installed
+  const nodeModules = path.join(dir, 'node_modules');
+  if (!fs.existsSync(nodeModules)) throw new Error('node_modules not created');
+  const pkgDir = path.join(nodeModules, 'semver');
+  if (!fs.existsSync(pkgDir)) throw new Error('semver package not installed');
+});
+
+test('plain install skips already installed dependencies', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  const plnFile = path.join(dir, 'app.pln');
+  fs.writeFileSync(plnFile, 'use semver\nshow "ok"\n');
+  // First install
+  runCli(['install'], dir);
+  // Second install should say all installed
+  const out = runCli(['install'], dir);
+  if (!out.includes('All dependencies are already installed.')) {
+    throw new Error(`Expected "All dependencies are already installed." but got: ${out}`);
   }
 });
 
-test('dependency validation error mentions the missing package name', () => {
+test('plain install handles multiple dependencies', () => {
   const dir = tmpDir();
+  runCli(['init'], dir);
   const plnFile = path.join(dir, 'app.pln');
-  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
-  const out = runCli(['build', plnFile], dir);
-  if (!out.includes('express')) {
-    throw new Error(`Expected package name "express" in error message. Got: ${out}`);
+  fs.writeFileSync(plnFile, 'use semver\nuse express\nshow "ok"\n');
+  const out = runCli(['install'], dir);
+  if (!out.includes('Found 2 required package(s).')) {
+    throw new Error(`Expected "Found 2 required package(s)." but got: ${out}`);
+  }
+  if (!out.includes('Installing semver...')) throw new Error('semver install missing');
+  if (!out.includes('Installing express...')) throw new Error('express install missing');
+});
+
+test('plain install fails when entry file is missing', () => {
+  const dir = tmpDir();
+  runCli(['init'], dir);
+  // Remove the entry file
+  const entry = path.join(dir, 'app.pln');
+  fs.unlinkSync(entry);
+  const out = runCli(['install'], dir);
+  if (!out.toLowerCase().includes('entry file "app.pln" not found')) {
+    throw new Error(`Expected entry file not found error but got: ${out}`);
   }
 });
 
-test('dependency validation error includes "plain add" hint', () => {
+test('plain install shows friendly error on resolver failure (circular import)', () => {
   const dir = tmpDir();
-  const plnFile = path.join(dir, 'app.pln');
-  fs.writeFileSync(plnFile, 'use express\nshow "hi"\n');
-  const out = runCli(['build', plnFile], dir);
-  if (!out.includes('plain add')) {
-    throw new Error(`Expected "plain add" hint in error message. Got: ${out}`);
+  runCli(['init'], dir);
+  const entry = path.join(dir, 'app.pln');
+  fs.writeFileSync(entry, 'import "./a.pln"\n');
+  const aFile = path.join(dir, 'a.pln');
+  fs.writeFileSync(aFile, 'import "./app.pln"\n');
+  const out = runCli(['install'], dir);
+  if (!out.toLowerCase().includes('circular')) {
+    throw new Error(`Expected circular import error but got: ${out}`);
   }
 });
+
+// ── End of install tests ────────────────────────────────────────────────────
 
 console.log('\nv0.4.2 — CLI help');
 
