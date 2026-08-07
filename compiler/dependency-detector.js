@@ -32,6 +32,9 @@ function visit(node, onUse) {
 
   if (node.type === 'UseStatement') {
     onUse(node.module);
+  } else if (node.type === 'WebAppStatement') {
+    // The `web app` shorthand creates an Express application.
+    onUse('express');
   } else if (node.type === 'DatabaseStatement') {
     // The `database` shorthand uses `better-sqlite3` under the hood.
     onUse('sqlite');
@@ -44,7 +47,7 @@ function visit(node, onUse) {
 
 /**
  * Return the unique npm packages required by Plain `use` statements
- * and `database` shorthand blocks.
+ * `web app` and `database` shorthand blocks.
  *
  * @param {string|object} source Plain source text or a parsed Plain AST
  * @returns {string[]} package names in first-seen order

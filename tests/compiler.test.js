@@ -85,6 +85,15 @@ test('detects better-sqlite3 from database shorthand', () => {
   assert(JSON.stringify(detectDependencies('database "app.db"')), '["better-sqlite3"]');
 });
 
+test('detects Express from web app shorthand', () => {
+  assert(JSON.stringify(detectDependencies('web app')), '["express"]');
+});
+
+test('deduplicates shorthand and explicit runtime dependencies', () => {
+  assert(JSON.stringify(detectDependencies('web app\nuse express\ndatabase "app.db"\nuse sqlite')),
+    '["express","better-sqlite3"]');
+});
+
 // ── Lexer ────────────────────────────────────────────────────────────────────
 
 console.log('\nLexer');
@@ -1120,9 +1129,9 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.0.0', () => {
+test('plain version shows 1.0.1', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.0')) throw new Error(`Expected version 1.0.0 but got: ${out}`);
+  if (!out.includes('1.0.1')) throw new Error(`Expected version 1.0.1 but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
@@ -1390,9 +1399,9 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.0.0', () => {
+test('plain version shows 1.0.1', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.0')) throw new Error(`Expected version 1.0.0 but got: ${out}`);
+  if (!out.includes('1.0.1')) throw new Error(`Expected version 1.0.1 but got: ${out}`);
 });
 
 // ── v0.6 — Extended comparisons ──────────────────────────────────────────────
@@ -1651,6 +1660,13 @@ test('"web app" generates const express', () => {
   if (!js.includes('const express')) throw new Error('missing const express');
 });
 
+test('duplicate runtime requires are emitted once', () => {
+  const js = compile('use express\nuse express\nweb app');
+  if ((js.match(/require\('express'\)/g) || []).length !== 1) {
+    throw new Error(`expected one express require, got:\n${js}`);
+  }
+});
+
 test('"route" shorthand compiles to app.get', () => {
   const src = 'route "/"\n  reply "Hello"\ndone';
   const js = compile(src);
@@ -1750,9 +1766,9 @@ test('"execute" block compiles to db.exec()', () => {
 
 console.log('\nv0.6 — CLI updates');
 
-test('plain version shows 1.0.0 (CLI)', () => {
+test('plain version shows 1.0.1 (CLI)', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.0.0')) throw new Error(`Expected 1.0.0 but got: ${out}`);
+  if (!out.includes('1.0.1')) throw new Error(`Expected 1.0.1 but got: ${out}`);
 });
 
 test('plain help mentions v1.0 features', () => {

@@ -1,6 +1,6 @@
-# Plain Language Specification (v1.0.0)
+# Plain Language Specification (v1.0.1)
 
-Version: 1.0.0
+Version: 1.0.1
 Status: Stable
 File Extension: .pln
 
@@ -238,11 +238,11 @@ Supported packages:
     use fs         → const fs = require('fs');
     use path       → const path = require('path');
 
-### Runtime dependency detection
+### Runtime dependency detection and installation
 
 The compiler exposes a reusable dependency detector that reads Plain source
-without installing packages. It scans every `use` statement and returns a
-unique list of npm package names in first-seen order.
+without duplicate results. It scans every `use` statement and runtime
+shorthand, returning a unique list of npm package names in first-seen order.
 
 Plain module names are mapped to npm packages:
 
@@ -250,12 +250,33 @@ Plain module names are mapped to npm packages:
 |--------------|-------------|
 | `express`    | `express`   |
 | `sqlite`     | `better-sqlite3` |
+| `web app`    | `express`   |
+| `axios`      | `axios`     |
+| `chalk`      | `chalk`     |
 
 Node built-in modules, including `fs` and `path`, are ignored because they do
 not need to be installed. A source file with no runtime package uses returns
 an empty list.
 
-Unknown packages produce a friendly compiler error.
+Built-in modules are never installed. Missing npm packages are installed by
+`plain install`, `plain run`, and `plain build`; package checks are cached for
+the duration of one CLI command so repeated imports do not rescan the
+filesystem.
+
+### Deployment workflow
+
+```bash
+plain init
+plain install
+plain build app.pln
+plain run app.pln
+```
+
+`plain start` uses the `entry` value in `plain.json` and performs the complete
+install, compile, and run workflow. `plain doctor` reports missing tools,
+configuration, or dependencies. Generated JavaScript remains standard
+Node.js-compatible JavaScript and runtime `require()` declarations are emitted
+once in deterministic order.
 
 ---
 
@@ -487,5 +508,5 @@ If a package is missing, the compiler prints a friendly error and stops:
 
 ---
 
-This document is the single source of truth for Plain v1.0.0.
+This document is the single source of truth for Plain v1.0.1.
 Every compiler implementation must follow this specification.

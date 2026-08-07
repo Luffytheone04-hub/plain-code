@@ -6,63 +6,98 @@ const KNOWN_PACKAGES = {
   sqlite:  `const Database = require('better-sqlite3');`,
   fs:      `const fs = require('fs');`,
   path:    `const path = require('path');`,
+  axios:   `const axios = require('axios');`,
+  chalk:   `const chalk = require('chalk');`,
+};
+
+const BUILTIN_DECLARATIONS = {
+  fs: `const fs = require('fs');`,
+  crypto: `const crypto = require('crypto');`,
 };
 
 // Built-in stdlib functions: Plain name → JS code generator.
 // v0.1–v0.4 original stdlib
 const STDLIB = {
-  length:    (args) => `(${generateExpr(args[0])}).length`,
-  uppercase: (args) => `(${generateExpr(args[0])}).toUpperCase()`,
-  lowercase: (args) => `(${generateExpr(args[0])}).toLowerCase()`,
+  length:    (args, context) => `(${generateExpr(args[0], context)}).length`,
+  uppercase: (args, context) => `(${generateExpr(args[0], context)}).toUpperCase()`,
+  lowercase: (args, context) => `(${generateExpr(args[0], context)}).toLowerCase()`,
   random:    (_args) => `Math.random()`,
-  round:     (args)  => `Math.round(${generateExpr(args[0])})`,
+  round:     (args, context)  => `Math.round(${generateExpr(args[0], context)})`,
   // Runtime constructors
-  sqlite:    (args)  => `new Database(${args.map(generateExpr).join(', ')})`,
+  sqlite:    (args, context)  => `new Database(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
   // v0.6 — runtime standard library
-  print:      (args) => `console.log(${args.map(generateExpr).join(', ')})`,
-  readFile:   (args) => `require('fs').readFileSync(${generateExpr(args[0])}, 'utf8')`,
-  writeFile:  (args) => `require('fs').writeFileSync(${generateExpr(args[0])}, ${generateExpr(args[1])}, 'utf8')`,
-  fileExists: (args) => `require('fs').existsSync(${generateExpr(args[0])})`,
-  sleep:      (args) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0])})`,
+  print:      (args, context) => `console.log(${args.map(arg => generateExpr(arg, context)).join(', ')})`,
+  readFile:   (args, context) => `fs.readFileSync(${generateExpr(args[0], context)}, 'utf8')`,
+  writeFile:  (args, context) => `fs.writeFileSync(${generateExpr(args[0], context)}, ${generateExpr(args[1], context)}, 'utf8')`,
+  fileExists: (args, context) => `fs.existsSync(${generateExpr(args[0], context)})`,
+  sleep:      (args, context) => `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${generateExpr(args[0], context)})`,
   time:       (_args) => `Date.now()`,
   date:       (_args) => `new Date().toISOString()`,
-  jsonEncode: (args) => `JSON.stringify(${generateExpr(args[0])})`,
-  jsonDecode: (args) => `JSON.parse(${generateExpr(args[0])})`,
-  env:        (args) => `process.env[${generateExpr(args[0])}]`,
-  exit:       (args) => `process.exit(${args.length ? generateExpr(args[0]) : '0'})`,
-  uuid:       (_args) => `require('crypto').randomUUID()`,
+  jsonEncode: (args, context) => `JSON.stringify(${generateExpr(args[0], context)})`,
+  jsonDecode: (args, context) => `JSON.parse(${generateExpr(args[0], context)})`,
+  env:        (args, context) => `process.env[${generateExpr(args[0], context)}]`,
+  exit:       (args, context) => `process.exit(${args.length ? generateExpr(args[0], context) : '0'})`,
+  uuid:       (_args, context) => `crypto.randomUUID()`,
 };
 
 // Set to true while generating inside a route handler body.
 // Remaps Plain's "request" → "req" and "response" → "res".
 let _inRoute = false;
 
-function generate(ast) {
+function createGenerationContext() {
+  return { requires: new Set(), pendingPrelude: [] };
+}
+
+function emitRequire(context, moduleName) {
+  if (context.requires.has(moduleName)) return '';
+  context.requires.add(moduleName);
+
+  if (KNOWN_PACKAGES[moduleName]) return KNOWN_PACKAGES[moduleName];
+
+  // Keep the old friendly error for the formerly unsupported placeholder
+  // package while allowing RFC-0009.3's explicitly supported packages.
+  throw new Error(
+    `Unknown package "${moduleName}".\n\nPlain supports: ${Object.keys(KNOWN_PACKAGES).join(', ')}.\n\nExample:\n  use express`
+  );
+}
+
+function ensureBuiltin(context, moduleName) {
+  if (context.requires.has(moduleName)) return;
+  context.requires.add(moduleName);
+  const declaration = BUILTIN_DECLARATIONS[moduleName];
+  if (declaration && !context.pendingPrelude.includes(declaration)) {
+    context.pendingPrelude.push(declaration);
+  }
+}
+
+function generate(ast, context = createGenerationContext()) {
   if (ast.type !== 'Program') {
     throw new Error(`Expected a Program node but got "${ast.type}".`);
   }
-  return ast.body.map(node => generateStatement(node)).filter(Boolean).join('\n');
+  const preludeStart = context.pendingPrelude.length;
+  const body = ast.body.map(node => generateStatement(node, '', context)).filter(Boolean).join('\n');
+  return context.pendingPrelude.slice(preludeStart).concat(body).filter(Boolean).join('\n');
 }
 
 // ── Condition generation ────────────────────────────────────────────────────
 
-function generateCondition(cond) {
+function generateCondition(cond, context) {
   switch (cond.type) {
     case 'BinaryCondition':
-      return `${generateExpr(cond.left)} ${cond.op} ${generateExpr(cond.right)}`;
+      return `${generateExpr(cond.left, context)} ${cond.op} ${generateExpr(cond.right, context)}`;
 
     case 'UnaryCondition':
-      if (cond.op === 'isEmpty')    return `(${generateExpr(cond.left)}).length === 0`;
-      if (cond.op === 'isNotEmpty') return `(${generateExpr(cond.left)}).length > 0`;
+      if (cond.op === 'isEmpty')    return `(${generateExpr(cond.left, context)}).length === 0`;
+      if (cond.op === 'isNotEmpty') return `(${generateExpr(cond.left, context)}).length > 0`;
       throw new Error(`Unknown unary condition op "${cond.op}".`);
 
     case 'BetweenCondition': {
-      const expr = generateExpr(cond.left);
-      return `${expr} >= ${generateExpr(cond.low)} && ${expr} <= ${generateExpr(cond.high)}`;
+      const expr = generateExpr(cond.left, context);
+      return `${expr} >= ${generateExpr(cond.low, context)} && ${expr} <= ${generateExpr(cond.high, context)}`;
     }
 
     case 'StringCondition':
-      return `(${generateExpr(cond.left)}).${cond.method}(${generateExpr(cond.right)})`;
+      return `(${generateExpr(cond.left, context)}).${cond.method}(${generateExpr(cond.right, context)})`;
 
     default:
       throw new Error(`Unknown condition type "${cond.type}".`);
@@ -71,84 +106,79 @@ function generateCondition(cond) {
 
 // ── Statement generation ────────────────────────────────────────────────────
 
-function generateStatement(node, indent = '') {
+function generateStatement(node, indent = '', context = createGenerationContext()) {
   switch (node.type) {
     case 'RememberStatement':
-      return `${indent}let ${node.name} = ${generateExpr(node.value)};`;
+      return `${indent}let ${node.name} = ${generateExpr(node.value, context)};`;
 
     case 'ShowStatement':
-      return `${indent}console.log(${generateExpr(node.value)});`;
+      return `${indent}console.log(${generateExpr(node.value, context)});`;
 
     case 'GiveStatement':
-      return `${indent}return ${generateExpr(node.value)};`;
+      return `${indent}return ${generateExpr(node.value, context)};`;
 
     case 'BecomeStatement':
-      return `${indent}${generateLValue(node.target)} = ${generateExpr(node.value)};`;
+      return `${indent}${generateLValue(node.target, context)} = ${generateExpr(node.value, context)};`;
 
     case 'ExpressionStatement':
-      return `${indent}${generateExpr(node.expression)};`;
+      return `${indent}${generateExpr(node.expression, context)};`;
 
     case 'ImportStatement':
       return ''; // resolved at bundle time by the bundler
 
     case 'UseStatement': {
-      const pkg = KNOWN_PACKAGES[node.module];
-      if (!pkg) {
-        throw new Error(
-          `Unknown package "${node.module}".\n\nPlain supports: ${Object.keys(KNOWN_PACKAGES).join(', ')}.\n\nExample:\n  use express`
-        );
-      }
-      return `${indent}${pkg}`;
+      const pkg = emitRequire(context, node.module);
+      return pkg ? `${indent}${pkg}` : '';
     }
 
     case 'FunctionDeclaration': {
       const params = node.params.join(', ');
-      const body   = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      const body   = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       return `${indent}function ${node.name}(${params}) {\n${body}\n${indent}}`;
     }
 
     case 'IfStatement': {
-      const condition  = generateCondition(node.condition);
-      const consequent = node.consequent.map(s => generateStatement(s, indent + '  ')).join('\n');
+      const condition  = generateCondition(node.condition, context);
+      const consequent = node.consequent.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       let out = `${indent}if (${condition}) {\n${consequent}\n${indent}}`;
       if (node.alternate) {
-        const alternate = node.alternate.map(s => generateStatement(s, indent + '  ')).join('\n');
+        const alternate = node.alternate.map(s => generateStatement(s, indent + '  ', context)).join('\n');
         out += ` else {\n${alternate}\n${indent}}`;
       }
       return out;
     }
 
     case 'ForEachStatement': {
-      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
-      return `${indent}for (const ${node.item} of ${generateExpr(node.collection)}) {\n${body}\n${indent}}`;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      return `${indent}for (const ${node.item} of ${generateExpr(node.collection, context)}) {\n${body}\n${indent}}`;
     }
 
     case 'WhileStatement': {
-      const condition = generateCondition(node.condition);
-      const body      = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      const condition = generateCondition(node.condition, context);
+      const body      = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       return `${indent}while (${condition}) {\n${body}\n${indent}}`;
     }
 
     // v0.3 — Express runtime
 
     case 'ListenStatement': {
-      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
-      return `${indent}app.listen(${generateExpr(node.port)}, () => {\n${body}\n${indent}});`;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      return `${indent}app.listen(${generateExpr(node.port, context)}, () => {\n${body}\n${indent}});`;
     }
 
     case 'RouteStatement': {
       _inRoute = true;
-      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       _inRoute = false;
       return `${indent}app.get(${JSON.stringify(node.path)}, (req, res) => {\n${body}\n${indent}});`;
     }
 
     case 'ReplyStatement':
-      return `${indent}res.send(${generateExpr(node.value)});`;
+      return `${indent}res.send(${generateExpr(node.value, context)});`;
 
     case 'ReplyJsonStatement': {
       const props = node.properties
-        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value)}`)
+        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
         .join(', ');
       return `${indent}res.json({ ${props} });`;
     }
@@ -159,25 +189,26 @@ function generateStatement(node, indent = '') {
     // v0.6 — Express DX
 
     case 'WebAppStatement':
-      return `${indent}const express = require('express');\n${indent}const app = express();`;
+      return [emitRequire(context, 'express'), `${indent}const app = express();`]
+        .filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
 
     case 'SimpleRouteStatement': {
       _inRoute = true;
-      const body = node.body.map(s => generateStatement(s, indent + '  ')).join('\n');
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       _inRoute = false;
       return `${indent}app.get(${JSON.stringify(node.path)}, (req, res) => {\n${body}\n${indent}});`;
     }
 
     case 'StartStatement':
-      return `${indent}app.listen(${generateExpr(node.port)});`;
+      return `${indent}app.listen(${generateExpr(node.port, context)});`;
 
     // v0.6 — SQLite DX
 
     case 'DatabaseStatement':
       return [
-        `${indent}const Database = require('better-sqlite3');`,
+        emitRequire(context, 'sqlite'),
         `${indent}const db = new Database(${JSON.stringify(node.file)});`,
-      ].join('\n');
+      ].filter(Boolean).map(line => line.startsWith('const ') ? `${indent}${line}` : line).join('\n');
 
     case 'QueryStatement':
       return `${indent}db.prepare(\`${node.sql}\`).all();`;
@@ -196,14 +227,14 @@ function generateStatement(node, indent = '') {
 }
 
 // Generates a valid JS assignment target (left-hand side of =).
-function generateLValue(node) {
+function generateLValue(node, context) {
   if (node.type === 'Identifier')       return node.name;
-  if (node.type === 'IndexExpression')  return `${generateExpr(node.object)}[${generateExpr(node.index)}]`;
-  if (node.type === 'MemberExpression') return `${generateExpr(node.object)}.${node.property}`;
+  if (node.type === 'IndexExpression')  return `${generateExpr(node.object, context)}[${generateExpr(node.index, context)}]`;
+  if (node.type === 'MemberExpression') return `${generateExpr(node.object, context)}.${node.property}`;
   throw new Error(`Invalid assignment target "${node.type}".`);
 }
 
-function generateExpr(node) {
+function generateExpr(node, context = createGenerationContext()) {
   switch (node.type) {
     case 'StringLiteral':    return JSON.stringify(node.value);
     case 'NumberLiteral':    return String(node.value);
@@ -215,27 +246,34 @@ function generateExpr(node) {
       return node.name;
     }
 
-    case 'BinaryExpression': return `${generateExpr(node.left)} ${node.operator} ${generateExpr(node.right)}`;
+    case 'BinaryExpression': return `${generateExpr(node.left, context)} ${node.operator} ${generateExpr(node.right, context)}`;
 
     case 'ArrayLiteral':
-      return `[${node.elements.map(generateExpr).join(', ')}]`;
+      return `[${node.elements.map(element => generateExpr(element, context)).join(', ')}]`;
 
     case 'ObjectLiteral': {
       const props = node.properties
-        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value)}`)
+        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
         .join(', ');
       return `{ ${props} }`;
     }
 
     case 'IndexExpression':
-      return `${generateExpr(node.object)}[${generateExpr(node.index)}]`;
+      return `${generateExpr(node.object, context)}[${generateExpr(node.index, context)}]`;
 
     case 'MemberExpression':
-      return `${generateExpr(node.object)}.${node.property}`;
+      return `${generateExpr(node.object, context)}.${node.property}`;
 
     case 'CallExpression': {
-      if (STDLIB[node.name]) return STDLIB[node.name](node.args);
-      return `${node.name}(${node.args.map(generateExpr).join(', ')})`;
+      if (STDLIB[node.name]) {
+        if (node.name === 'readFile' || node.name === 'writeFile' || node.name === 'fileExists') {
+          ensureBuiltin(context, 'fs');
+        } else if (node.name === 'uuid') {
+          ensureBuiltin(context, 'crypto');
+        }
+        return STDLIB[node.name](node.args, context);
+      }
+      return `${node.name}(${node.args.map(arg => generateExpr(arg, context)).join(', ')})`;
     }
 
     default:

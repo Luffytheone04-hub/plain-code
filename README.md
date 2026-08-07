@@ -21,13 +21,15 @@ plain run app.pln
 CLI
 
 ```
-plain run    <file.pln>   Compile and execute a Plain program
-plain build  <file.pln>   Compile to JavaScript without running
+plain run    <file.pln>   Install missing dependencies, compile and execute
+plain build  <file.pln>   Install missing dependencies and compile
 plain check  <file.pln>   Check syntax only (no output, no execution)
 plain fmt    <file.pln>   Format a Plain file in-place
 plain new    [name]       Create a new Plain project
 plain init               Create a plain.json in the current directory
 plain install            Install dependencies required by the project's source files
+plain start              Start the entry file from plain.json
+plain doctor             Check the Plain project environment
 plain add    <package>   Install a package and add it to plain.json
 plain remove <package>   Remove a package from plain.json and uninstall it
 plain update             Update all installed npm packages
@@ -214,28 +216,39 @@ Update all installed npm packages:
 plain update
 ```
 
-Dependency validation
+Automatic runtime dependencies
 
-Before compiling, Plain checks that every package referenced by use is installed.
-If a package is missing, you see a friendly error:
+Plain detects dependencies from `use` statements and shorthand features such as
+`web app` and `database`. Built-in Node modules are ignored. `plain run` and
+`plain build` install missing npm packages automatically; `plain install` does
+the same without compiling or running the project.
 
 ```
-Package "express" is not installed.
-Run: plain add express
+✓ express already installed
+Installing axios...
+✓ axios installed
+Done.
 ```
 
 Runtime dependency detection
 
-Plain can inspect a source file and list the npm packages it needs without
-installing anything. The reusable detector scans use statements, maps Plain
-module names to their npm packages, ignores Node built-ins such as fs and
-path, and removes duplicates.
+Plain can inspect a source file and list the npm packages it needs. The
+reusable detector scans use statements, maps Plain module names to their npm
+packages, detects shorthand runtime features, ignores Node built-ins such as
+fs and path, and removes duplicates.
 
 The current mappings include:
 
 Plain module npm package
 express express
 sqlite better-sqlite3
+web app express
+axios axios
+chalk chalk
+
+`plain start` reads the entry file from `plain.json`, installs missing runtime
+packages, compiles, and runs the application. `plain doctor` checks Node, npm,
+the Plain compiler, formatter, runtime, project configuration, and dependencies.
 
 ---
 

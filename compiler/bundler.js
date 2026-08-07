@@ -77,7 +77,8 @@ function resolveDependencies(entryPath) {
 // Compile all files in dependency order into one JavaScript string.
 function bundle(entryPath) {
   const files = resolveDependencies(entryPath);
-  const parts = files.map(({ ast }) => generate(ast)).filter(js => js.trim() !== '');
+  const context = { requires: new Set(), pendingPrelude: [] };
+  const parts = files.map(({ ast }) => generate(ast, context)).filter(js => js.trim() !== '');
   return parts.join('\n');
 }
 

@@ -2,8 +2,8 @@
 // CLI: compile and run Plain (.pln) files.
 //
 // Usage:
-//   plain run    <file.pln>   compile and execute
-//   plain build  <file.pln>   compile to JavaScript (outputs <file>.js)
+//   plain run    <file.pln>   install missing dependencies, compile and execute
+//   plain build  <file.pln>   install missing dependencies and compile
 //   plain check  <file.pln>   check syntax only (no JS generated, no execution)
 //   plain fmt    <file.pln>   format a Plain file in-place
 //   plain new    [name]       scaffold a new Plain project
@@ -17,14 +17,15 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { execSync, execFileSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
 const { generate } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
+const { detectDependencies, PACKAGE_MAP, isBuiltinModule } = require('./dependency-detector');
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -46,13 +47,15 @@ Plain v${VERSION} — Intent-Oriented Programming Language
 
 Commands
 
-  plain run    <file.pln>   Compile and execute a Plain program
-  plain build  <file.pln>   Compile to JavaScript without running
+  plain run    <file.pln>   Install dependencies, compile and execute
+  plain build  <file.pln>   Install dependencies and compile to JavaScript
   plain check  <file.pln>   Check syntax only (no output, no execution)
   plain fmt    <file.pln>   Format a Plain file in-place
   plain new    [name]       Create a new Plain project
   plain init               Create a plain.json in the current directory
   plain install            Install dependencies required by the project's source files
+  plain start              Start the entry file from plain.json
+  plain doctor             Check the Plain project environment
   plain add    <package>   Install a package and add it to plain.json
   plain remove <package>   Remove a package from plain.json and uninstall it
   plain update             Update all installed npm packages
@@ -126,63 +129,75 @@ function stage(label, fn) {
 
 // Map Plain package names to their npm package names (same as the compiler's
 // KNOWN_PACKAGES in generator.js).
-const PLAIN_TO_NPM = {
-  express: 'express',
-  sqlite:  'better-sqlite3',
-  path:    'path',
-  fs:      'fs',
-};
-
-// Returns the npm package name for a Plain `use` package name, or null if
-// it is a built-in Node.js module that needs no installation.
-const NODE_BUILTINS = new Set(['fs', 'path', 'os', 'crypto', 'http', 'https', 'url', 'events', 'stream', 'util', 'buffer']);
-
-function npmNameFor(plainPkg) {
-  return PLAIN_TO_NPM[plainPkg] || plainPkg;
-}
-
-function isBuiltin(npmPkg) {
-  return NODE_BUILTINS.has(npmPkg);
-}
+// Keep dependency checks in one CLI execution cheap and deterministic.
+const dependencyCache = new Map();
 
 // Check whether an npm package is installed in the nearest node_modules.
-function isInstalled(npmPkg) {
-  if (isBuiltin(npmPkg)) return true;
+function isInstalled(npmPkg, cwd = process.cwd()) {
+  if (isBuiltinModule(npmPkg)) return true;
+  const cacheKey = `${cwd}\0${npmPkg}`;
+  if (dependencyCache.has(cacheKey)) return dependencyCache.get(cacheKey);
+  let installed = false;
   try {
-    require.resolve(npmPkg, { paths: [process.cwd()] });
-    return true;
+    require.resolve(npmPkg, { paths: [cwd] });
+    installed = true;
   } catch (_) {
-    return false;
+    installed = false;
   }
+  dependencyCache.set(cacheKey, installed);
+  return installed;
 }
 
-// Extract `use <pkg>` statements from an AST.
-function getUsedPackages(ast) {
-  return ast.body
-    .filter(n => n.type === 'UseStatement')
-    .map(n => n.module);
+function npmNameFor(plainPkg) {
+  return PACKAGE_MAP[plainPkg] || plainPkg;
 }
 
-// Validate that all npm packages referenced by `use` statements are installed.
-function validateDependencies(files) {
-  const missing = [];
+function requiredDependencies(files, config) {
+  const packages = new Set();
   for (const { ast } of files) {
-    for (const plainPkg of getUsedPackages(ast)) {
-      const npm = npmNameFor(plainPkg);
-      if (!isBuiltin(npm) && !isInstalled(npm)) {
-        missing.push({ plainPkg, npm });
-      }
+    for (const npm of detectDependencies(ast)) packages.add(npm);
+  }
+  // plain.json dependencies are also valid runtime declarations. They are
+  // merged through a Set so source and configuration can never duplicate work.
+  for (const npm of Object.keys((config && config.dependencies) || {})) {
+    if (!isBuiltinModule(npm)) packages.add(npm);
+  }
+  return [...packages];
+}
+
+function missingDependencies(files, config, cwd = process.cwd()) {
+  return requiredDependencies(files, config).filter(pkg => !isInstalled(pkg, cwd));
+}
+
+function installPackages(packages, cwd = process.cwd()) {
+  for (const pkg of packages) {
+    console.log(`${clrCyan('Installing')} ${pkg}...`);
+    try {
+      execFileSync('npm', ['install', pkg, '--no-audit', '--no-fund'], {
+        cwd,
+        stdio: 'ignore',
+      });
+      dependencyCache.set(`${cwd}\0${pkg}`, true);
+      console.log(`${clrGreen('✓')} ${pkg} installed`);
+    } catch (_) {
+      throw new Error(
+        `Could not install "${pkg}". The package may be unavailable or the machine may be offline.\n` +
+        `Run manually: npm install ${pkg}`
+      );
     }
   }
-  if (missing.length > 0) {
-    const lines = missing.map(({ plainPkg, npm }) => {
-      const hint = plainPkg === npm
-        ? `plain add ${npm}`
-        : `plain add ${npm}`;
-      return `  Package "${npm}" is not installed.\n  Run: ${hint}`;
-    });
-    throw new Error(`Missing dependencies:\n\n${lines.join('\n\n')}`);
+}
+
+function ensureDependencies(files, config, install = true) {
+  const required = requiredDependencies(files, config);
+  const missing = required.filter(pkg => !isInstalled(pkg));
+  if (missing.length === 0) return { required, missing };
+  if (install) {
+    installPackages(missing);
+    return { required, missing: [] };
   }
+  const lines = missing.map(pkg => `  Package "${pkg}" is not installed.\n  Run: npm install ${pkg}`);
+  throw new Error(`Missing dependencies:\n\n${lines.join('\n\n')}`);
 }
 
 function compile(filePath) {
@@ -191,9 +206,10 @@ function compile(filePath) {
     files = resolveDependencies(path.resolve(filePath));
   });
   stage('Building dependency graph', () => files);
-  stage('Validating dependencies', () => validateDependencies(files));
+  stage('Checking runtime dependencies', () => ensureDependencies(files, readPlainJson(), true));
+  const generationContext = { requires: new Set(), pendingPrelude: [] };
   const js = stage('Generating JavaScript', () =>
-    files.map(({ ast }) => generate(ast)).filter(s => s.trim()).join('\n')
+    files.map(({ ast }) => generate(ast, generationContext)).filter(s => s.trim()).join('\n')
   );
   return js;
 }
@@ -226,6 +242,20 @@ function cmdBuild(filePath) {
   const outPath = filePath.replace(/\.pln$/, '.js');
   fs.writeFileSync(path.resolve(outPath), js, 'utf8');
   console.log(`\nOutput written to ${outPath}`);
+}
+
+function cmdStart() {
+  const config = readPlainJson();
+  if (!config) {
+    console.error(`No ${PLAIN_JSON} found. Run "plain init" first.`);
+    process.exit(1);
+  }
+  const entry = config.entry || 'app.pln';
+  if (!fs.existsSync(path.resolve(entry))) {
+    console.error(`Entry file "${entry}" not found.`);
+    process.exit(1);
+  }
+  cmdRun(entry);
 }
 
 function cmdNew(projectName) {
@@ -319,6 +349,12 @@ function cmdInit() {
     version: '0.1.0',
     entry: 'app.pln',
   });
+  // Keep the default entry discoverable and make `plain install` immediately
+  // actionable after initialization.
+  const entryPath = path.resolve('app.pln');
+  if (!fs.existsSync(entryPath)) {
+    fs.writeFileSync(entryPath, '// Plain application entry point\nshow "Hello from Plain"\n', 'utf8');
+  }
   console.log(`✓ Created ${PLAIN_JSON}`);
 }
 
@@ -348,33 +384,17 @@ function cmdInstall() {
   }
 
   console.log('Scanning source files...');
-  // Collect all required npm packages
-  const packageSet = new Set();
-  for (const file of files) {
-    const used = getUsedPackages(file.ast);
-    for (const plainPkg of used) {
-      const npm = npmNameFor(plainPkg);
-      if (!isBuiltin(npm)) {
-        packageSet.add(npm);
-      }
-    }
-  }
-
-  const requiredPackages = [...packageSet];
+  const requiredPackages = requiredDependencies(files, config);
   if (requiredPackages.length === 0) {
     console.log('This project has no external dependencies.');
     return;
   }
 
   // Determine which are missing
-  const missing = [];
-  for (const pkg of requiredPackages) {
-    if (!isInstalled(pkg)) {
-      missing.push(pkg);
-    }
-  }
+  const missing = requiredPackages.filter(pkg => !isInstalled(pkg));
 
   if (missing.length === 0) {
+    for (const pkg of requiredPackages) console.log(`${clrGreen('✓')} ${pkg} already installed`);
     console.log('All dependencies are already installed.');
     return;
   }
@@ -382,18 +402,47 @@ function cmdInstall() {
   console.log(`Found ${requiredPackages.length} required package(s).`);
   console.log(`Installing ${missing.length} missing package(s)...`);
 
-  // Install each missing package
-  for (const pkg of missing) {
-    console.log(`Installing ${pkg}...`);
-    try {
-      execFileSync('npm', ['install', pkg], { stdio: 'inherit', cwd: process.cwd() });
-    } catch (e) {
-      console.error(`Failed to install "${pkg}".`);
-      process.exit(1);
-    }
+  try {
+    installPackages(missing);
+  } catch (e) {
+    console.error(e.message);
+    process.exit(1);
   }
-
   console.log('Done.');
+}
+
+function cmdDoctor() {
+  console.log('Plain doctor\n');
+  const check = (label, ok, detail = '') => {
+    const suffix = detail ? ` — ${detail}` : '';
+    console.log(`${ok ? clrGreen('✓') : clrRed('✗')} ${label}${suffix}`);
+  };
+  check('Node.js', Boolean(process.version));
+  let npmVersion = '';
+  try { npmVersion = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(); } catch (_) {}
+  check('npm', Boolean(npmVersion), npmVersion);
+  check('Plain CLI', true);
+  check('Compiler', fs.existsSync(path.join(__dirname, 'parser.js')));
+  check('Formatter', fs.existsSync(path.join(__dirname, 'formatter.js')));
+  check('Runtime', fs.existsSync(path.join(__dirname, 'generator.js')));
+
+  const config = readPlainJson();
+  check('Project configuration', Boolean(config), config ? 'plain.json found' : 'run plain init');
+  if (!config) return;
+  const entry = config.entry || 'app.pln';
+  if (!fs.existsSync(path.resolve(entry))) {
+    check('Entry file', false, `"${entry}" not found`);
+    return;
+  }
+  try {
+    const files = resolveDependencies(path.resolve(entry));
+    const required = requiredDependencies(files, config);
+    const missing = required.filter(pkg => !isInstalled(pkg));
+    check('Dependencies', missing.length === 0,
+      missing.length ? `missing: ${missing.join(', ')}` : 'ready');
+  } catch (err) {
+    check('Dependencies', false, err.message);
+  }
 }
 
 // ── end of new cmdInstall ──────────────────────────────────────────────────
@@ -549,6 +598,8 @@ switch (command) {
   case 'new':     cmdNew(fileArg);        break;
   case 'init':    cmdInit();              break;
   case 'install': cmdInstall();           break;
+  case 'start':   cmdStart();             break;
+  case 'doctor':  cmdDoctor();            break;
   case 'add':     cmdAdd(fileArg);        break;
   case 'remove':  cmdRemove(fileArg);     break;
   case 'update':  cmdUpdate();            break;
