@@ -1,7 +1,32 @@
-modules = ["nodejs-14"]
+modules = ["nodejs-14", "python-base-3.13"]
 [nix]
 channel = "stable-25_05"
 packages = ["next-ls"]
 
 [agent]
 expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Docs preview"
+
+[[workflows.workflow]]
+name = "Docs preview"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd docs/website && npx serve . -p 5000 --no-clipboard"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80

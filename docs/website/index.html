@@ -1,249 +1,628 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plain — Intent-Oriented Programming Language</title>
-<meta name="description" content="Plain is an IOPL that lets you write programs in near-English sentences. Compiles to JavaScript.">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  :root {
-    --bg:      #0f1117;
-    --surface: #181c27;
-    --border:  #2a2f42;
-    --accent:  #4f80ff;
-    --accent2: #38d9a9;
-    --text:    #e4e8f0;
-    --muted:   #8892aa;
-    --code-bg: #1a1f2e;
-    --radius:  8px;
-    --max-w:   1100px;
-  }
+  <!-- SEO -->
+  <title>Plain — The programming language that reads like English</title>
+  <meta name="description" content="Plain is an Intent-Oriented Programming Language (IOPL). Write programs in near-English sentences and compile them to JavaScript. v1.0.0 — stable.">
+  <meta name="keywords" content="Plain, IOPL, intent-oriented programming, programming language, JavaScript, Plain language, plain-code, beginner programming language">
+  <link rel="canonical" href="https://plain-lang.dev/">
 
-  html { scroll-behavior: smooth; }
+  <!-- OpenGraph -->
+  <meta property="og:type"        content="website">
+  <meta property="og:url"         content="https://plain-lang.dev/">
+  <meta property="og:title"       content="Plain — The programming language that reads like English">
+  <meta property="og:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.0.0 — stable.">
+  <meta property="og:image"       content="https://plain-lang.dev/og.png">
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.7;
-    font-size: 16px;
-  }
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:title"       content="Plain — The programming language that reads like English">
+  <meta name="twitter:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.0.0 stable.">
+  <meta name="twitter:image"       content="https://plain-lang.dev/og.png">
 
-  /* ── Nav ────────────────────────────────────────────────────────────────── */
-  nav {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(15,17,23,.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--border);
-    padding: 0 2rem;
-  }
-  nav .inner {
-    max-width: var(--max-w);
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 58px;
-  }
-  .logo { font-weight: 700; font-size: 1.15rem; color: var(--text); text-decoration: none; }
-  .logo span { color: var(--accent); }
-  .nav-links { display: flex; gap: 1.5rem; list-style: none; }
-  .nav-links a { color: var(--muted); text-decoration: none; font-size: .9rem; transition: color .15s; }
-  .nav-links a:hover { color: var(--text); }
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
-  /* ── Layout ─────────────────────────────────────────────────────────────── */
-  .page { max-width: var(--max-w); margin: 0 auto; padding: 0 2rem 4rem; }
-
-  /* ── Hero ───────────────────────────────────────────────────────────────── */
-  .hero {
-    text-align: center;
-    padding: 5rem 1rem 4rem;
-    border-bottom: 1px solid var(--border);
-  }
-  .badge {
-    display: inline-block;
-    background: rgba(79,128,255,.15);
-    color: var(--accent);
-    border: 1px solid rgba(79,128,255,.3);
-    border-radius: 100px;
-    padding: .25rem .85rem;
-    font-size: .8rem;
-    font-weight: 600;
-    letter-spacing: .04em;
-    margin-bottom: 1.5rem;
-  }
-  .hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); font-weight: 800; line-height: 1.15; margin-bottom: 1rem; }
-  .hero h1 em { font-style: normal; color: var(--accent); }
-  .hero p { font-size: 1.1rem; color: var(--muted); max-width: 560px; margin: 0 auto 2.5rem; }
-  .cta-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    display: inline-block;
-    padding: .7rem 1.6rem;
-    border-radius: var(--radius);
-    font-weight: 600;
-    font-size: .95rem;
-    text-decoration: none;
-    transition: opacity .15s, transform .1s;
-  }
-  .btn:hover { opacity: .88; transform: translateY(-1px); }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-ghost   { background: transparent; color: var(--text); border: 1px solid var(--border); }
-
-  /* ── Code comparison ────────────────────────────────────────────────────── */
-  .compare {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin: 3rem 0;
-  }
-  @media (max-width: 680px) { .compare { grid-template-columns: 1fr; } }
-
-  /* ── Sections ───────────────────────────────────────────────────────────── */
-  section { padding: 3.5rem 0; border-bottom: 1px solid var(--border); }
-  section:last-child { border-bottom: none; }
-  .section-label {
-    font-size: .75rem;
-    font-weight: 700;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: .6rem;
-  }
-  h2 { font-size: 1.9rem; font-weight: 700; margin-bottom: .75rem; }
-  h3 { font-size: 1.15rem; font-weight: 600; margin-bottom: .5rem; color: var(--accent2); }
-  p  { color: var(--muted); margin-bottom: 1rem; }
-
-  /* ── Code blocks ────────────────────────────────────────────────────────── */
-  .code-card {
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .code-card .label {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: .5rem 1rem;
-    font-size: .75rem;
-    color: var(--muted);
-    font-weight: 600;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-  }
-  pre {
-    padding: 1.25rem 1.5rem;
-    overflow-x: auto;
-    font-size: .88rem;
-    line-height: 1.6;
-    tab-size: 4;
-  }
-  code { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace; }
-  code .kw  { color: #a78bfa; }   /* keywords */
-  code .str { color: #6ee7b7; }   /* strings */
-  code .num { color: #fbbf24; }   /* numbers */
-  code .cmt { color: #4b5563; }   /* comments */
-  code .fn  { color: #60a5fa; }   /* function names */
-  code .op  { color: #f472b6; }   /* operators */
-
-  /* ── Feature grid ───────────────────────────────────────────────────────── */
-  .feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.25rem;
-    margin-top: 2rem;
-  }
-  .feature-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    transition: border-color .2s;
-  }
-  .feature-card:hover { border-color: var(--accent); }
-  .feature-card .icon { font-size: 1.5rem; margin-bottom: .75rem; }
-  .feature-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: .35rem; color: var(--text); }
-  .feature-card p  { font-size: .88rem; color: var(--muted); margin: 0; }
-
-  /* ── Table ──────────────────────────────────────────────────────────────── */
-  table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: .9rem; }
-  th, td { text-align: left; padding: .65rem 1rem; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
-  td code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: .1em .4em; font-size: .85rem; color: var(--accent2); }
-  tr:last-child td { border-bottom: none; }
-
-  /* ── Install strip ──────────────────────────────────────────────────────── */
-  .install-strip {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin: 2rem 0;
-  }
-  .install-strip span { color: var(--muted); font-size: .9rem; }
-  .install-cmd {
-    font-family: monospace;
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: .5rem 1.25rem;
-    color: var(--accent2);
-    font-size: .95rem;
-    cursor: pointer;
-    user-select: all;
-  }
-
-  /* ── Footer ─────────────────────────────────────────────────────────────── */
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 2rem;
-    text-align: center;
-    color: var(--muted);
-    font-size: .85rem;
-  }
-</style>
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<nav>
-  <div class="inner">
-    <a class="logo" href="#"><span>Plain</span> v1.0</a>
-    <ul class="nav-links">
-      <li><a href="#quickstart">Quick Start</a></li>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- NAV                                                                      -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<nav class="site-nav" role="navigation" aria-label="Main navigation">
+  <div class="nav-inner">
+    <a class="nav-logo" href="#top">
+      <span class="logo-word">Plain</span>
+      <span class="logo-ver">v1.0.0</span>
+    </a>
+
+    <ul class="nav-links" role="list">
+      <li><a href="#quickstart">Docs</a></li>
+      <li><a href="#examples">Examples</a></li>
       <li><a href="#language">Language</a></li>
-      <li><a href="#stdlib">Stdlib</a></li>
-      <li><a href="#web">Web</a></li>
-      <li><a href="#database">Database</a></li>
       <li><a href="#cli">CLI</a></li>
+      <li><a href="#packages">Packages</a></li>
+      <li><a href="#faq">FAQ</a></li>
     </ul>
+
+    <div class="nav-actions">
+      <a class="nav-cta" href="https://github.com/ayoxx/plain" target="_blank" rel="noopener">
+        <i class="fa-brands fa-github"></i>
+        <span>GitHub</span>
+      </a>
+      <a class="nav-cta" href="https://www.npmjs.com/package/@ayoxx/plain-code" target="_blank" rel="noopener">
+        <i class="fa-brands fa-npm"></i>
+        <span>npm</span>
+      </a>
+      <button class="nav-hamburger" id="nav-hamburger" aria-label="Toggle menu" aria-expanded="false">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
   </div>
 </nav>
 
-<div class="page">
+<!-- Mobile menu -->
+<div class="mobile-menu" id="mobile-menu" role="dialog" aria-label="Mobile navigation">
+  <a href="#quickstart">Docs</a>
+  <a href="#examples">Examples</a>
+  <a href="#language">Language</a>
+  <a href="#stdlib">Standard Library</a>
+  <a href="#web">Web Development</a>
+  <a href="#database">SQLite</a>
+  <a href="#cli">CLI</a>
+  <a href="#packages">Packages</a>
+  <a href="#formatter">Formatter</a>
+  <a href="#vscode">VS Code</a>
+  <a href="#roadmap">Roadmap</a>
+  <a href="#faq">FAQ</a>
+  <a href="https://github.com/ayoxx/plain" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i> GitHub</a>
+  <a href="https://www.npmjs.com/package/@ayoxx/plain-code" target="_blank" rel="noopener"><i class="fa-brands fa-npm"></i> npm</a>
+</div>
 
-<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
-<div class="hero">
-  <div class="badge">v1.0 — First Stable Release</div>
-  <h1>When even a<br><em>simple sentence</em> can be code.</h1>
-  <p>Plain is an Intent-Oriented Programming Language. Write programs the way you'd explain them to a person. The compiler handles the rest.</p>
-  <div class="cta-group">
-    <a class="btn btn-primary" href="#quickstart">Get Started</a>
-    <a class="btn btn-ghost" href="#language">View Language →</a>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- HERO                                                                     -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<header class="hero" id="top">
+  <div class="container">
+    <div class="hero-grid">
+
+      <!-- Left: copy -->
+      <div class="hero-copy">
+        <div class="hero-badge">
+          <i class="fa-solid fa-bolt"></i>
+          v1.0.0 &mdash; First Stable Release
+        </div>
+        <h1 class="hero-title">
+          The language<br>
+          that reads<br>
+          like <span class="accent">English.</span>
+        </h1>
+        <p class="hero-sub">
+          Plain is an Intent-Oriented Programming Language. Describe <em>what</em> you want in near-English sentences and Plain compiles it to JavaScript. No boilerplate, no ceremony.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#quickstart">
+            <i class="fa-solid fa-rocket"></i>
+            Get Started
+          </a>
+          <a class="btn btn-outline" href="#language">
+            <i class="fa-solid fa-book"></i>
+            Language Reference
+          </a>
+          <a class="btn btn-outline" href="https://github.com/ayoxx/plain" target="_blank" rel="noopener">
+            <i class="fa-brands fa-github"></i>
+            GitHub
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: code -->
+      <div class="hero-code">
+        <div class="code-block">
+          <div class="code-block-header">
+            <div class="code-block-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <span class="code-block-title">app.pln</span>
+            <button class="code-copy" aria-label="Copy code">
+              <i class="fa-regular fa-copy"></i> Copy
+            </button>
+          </div>
+          <pre><code><span class="kw">web app</span>
+
+<span class="kw">route</span> <span class="str">"/"</span>
+    <span class="kw">reply json</span>
+        message <span class="kw">is</span> <span class="str">"Hello, World!"</span>
+        version <span class="kw">is</span> <span class="str">"1.0"</span>
+    <span class="kw">done</span>
+<span class="kw">done</span>
+
+<span class="kw">route</span> <span class="str">"/users/:id"</span>
+    <span class="kw">remember</span> id <span class="kw">as</span> request.params.id
+    <span class="kw">reply json</span>
+        user <span class="kw">is</span> id
+        status <span class="kw">is</span> <span class="str">"found"</span>
+    <span class="kw">done</span>
+<span class="kw">done</span>
+
+<span class="kw">start</span> <span class="num">3000</span></code></pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- STATS                                                                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<div class="container">
+  <div class="stats-row">
+    <div class="stat-item">
+      <div class="stat-value">35<span class="unit">+</span></div>
+      <div class="stat-label">Keywords</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">257</div>
+      <div class="stat-label">Tests Passing</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Config Files Needed</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">MIT</div>
+      <div class="stat-label">License</div>
+    </div>
   </div>
 </div>
 
-<!-- ── Compare ────────────────────────────────────────────────────────────── -->
-<div class="compare">
-  <div class="code-card">
-    <div class="label">Plain</div>
-    <pre><code><span class="kw">remember</span> name <span class="kw">as</span> <span class="str">"Ayokunle"</span>
-<span class="kw">remember</span> age  <span class="kw">as</span> <span class="num">17</span>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- WHY PLAIN                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="why">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-lightbulb"></i> Philosophy</div>
+    <h2 class="section-title">Why Plain?</h2>
+    <p class="section-lead">
+      Most programming languages were designed by and for computer scientists. Plain was designed to be understood by anyone who can write a sentence.
+    </p>
+
+    <div class="why-grid">
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-pen-nib"></i></div>
+        <h3>Intent, not implementation</h3>
+        <p>Write <em>what</em> you want to happen, not <em>how</em> JavaScript should do it. The compiler bridges the gap, generating clean, readable JS output.</p>
+      </div>
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-gauge-high"></i></div>
+        <h3>Zero configuration</h3>
+        <p>No webpack. No tsconfig. No babel. Drop a <code>.pln</code> file anywhere and run it. Configuration is optional and stored in a single <code>plain.json</code>.</p>
+      </div>
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-ruler"></i></div>
+        <h3>One way to do everything</h3>
+        <p>No decision fatigue. Plain has exactly one way to declare a variable, one way to loop, one way to define a function. Less syntax to memorise, more time to build.</p>
+      </div>
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-comment-dots"></i></div>
+        <h3>Errors that teach</h3>
+        <p>Every error message tells you what went wrong, which line, and — when possible — exactly what to type instead. The compiler is a tutor, not a gatekeeper.</p>
+      </div>
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-puzzle-piece"></i></div>
+        <h3>npm-compatible</h3>
+        <p>Any npm package can be declared with <code>use</code> and installed with <code>plain add</code>. The entire Node.js ecosystem is one keyword away.</p>
+      </div>
+      <div class="why-item">
+        <div class="why-num"><i class="fa-solid fa-eye"></i></div>
+        <h3>Code that reads like docs</h3>
+        <p>Plain code doubles as documentation. Hand it to a non-programmer and they will understand it. That constraint makes your code better for everyone.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- FEATURES                                                                 -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="features">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-cubes"></i> Features</div>
+    <h2 class="section-title">Everything you need. Nothing you don&rsquo;t.</h2>
+    <p class="section-lead">
+      Plain ships with batteries included — a full standard library, built-in web and database support, a formatter, and a VS Code extension.
+    </p>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-font"></i></div>
+        <h4>English Keywords</h4>
+        <p>Every keyword — <code>remember</code>, <code>becomes</code>, <code>show</code>, <code>make</code>, <code>give</code> — was chosen to mirror plain English. No symbol soup.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-server"></i></div>
+        <h4>Built-in Web DX</h4>
+        <p>First-class Express integration with <code>web app</code>, <code>route</code>, <code>reply json</code>, and <code>start</code>. Build REST APIs in a dozen lines.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-database"></i></div>
+        <h4>Built-in SQLite DX</h4>
+        <p>Write SQL inline with <code>query</code>, <code>insert</code>, <code>update</code>, <code>delete</code>, and <code>execute</code> blocks. Powered by <code>better-sqlite3</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-box"></i></div>
+        <h4>Standard Library</h4>
+        <p>20+ built-in functions for I/O, strings, numbers, files, time, JSON, and UUID — all available with no import statement.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+        <h4>Auto Formatter</h4>
+        <p>One command formats your entire <code>.pln</code> file with consistent 4-space indentation, proper spacing, and normalised blank lines.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-code"></i></div>
+        <h4>VS Code Extension</h4>
+        <p>Syntax highlighting, snippets, bracket matching, comment toggling, and code folding — all for <code>.pln</code> files out of the box.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- INSTALLATION / QUICK START                                               -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="quickstart">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-download"></i> Setup</div>
+    <h2 class="section-title">Quick Start</h2>
+    <p class="section-lead">
+      Plain compiles <code>.pln</code> files to JavaScript and runs them with Node.js. No bundlers, no transpilers, no configuration required.
+    </p>
+
+    <div class="install-strip">
+      <div class="install-strip-label">
+        <i class="fa-brands fa-npm"></i>
+        Install globally via npm
+      </div>
+      <div class="install-cmd">
+        <code>npm install -g @ayoxx/plain-code</code>
+        <button aria-label="Copy install command">
+          <i class="fa-regular fa-copy"></i> Copy
+        </button>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-folder-plus"></i> Create a new project</h3>
+
+    <div class="code-block" style="margin-bottom:1.5rem">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">Terminal</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code><span class="prm">$</span> plain new myapp
+<span class="prm">$</span> cd myapp
+<span class="prm">$</span> plain install
+<span class="prm">$</span> plain run app.pln</code></pre>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-file-code"></i> Your first Plain program</h3>
+
+    <div class="compare" style="margin-bottom:1.5rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">hello.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> name <span class="kw">as</span> <span class="str">"World"</span>
+<span class="kw">show</span> <span class="str">"Hello, "</span> + name
+
+<span class="kw">make</span> <span class="fn">greet</span>(person)
+    <span class="kw">show</span> <span class="str">"Nice to meet you, "</span> + person
+<span class="kw">done</span>
+
+<span class="fn">greet</span>(name)</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Generated JavaScript</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">let</span> name = <span class="str">"World"</span>;
+console.<span class="fn">log</span>(<span class="str">"Hello, "</span> + name);
+
+<span class="kw">function</span> <span class="fn">greet</span>(person) {
+    console.<span class="fn">log</span>(<span class="str">"Nice to meet you, "</span> + person);
+}
+
+<span class="fn">greet</span>(name);</code></pre>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-terminal"></i> Essential commands</h3>
+    <div class="feature-grid" style="margin-top:1rem">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <h4>plain check</h4>
+        <p>Validate syntax without compiling or running. Exits 0 on success, 1 on error. Ideal for CI pipelines.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-paintbrush"></i></div>
+        <h4>plain fmt</h4>
+        <p>Auto-format your <code>.pln</code> file in-place with consistent 4-space indentation and normalised spacing.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-cubes"></i></div>
+        <h4>plain add</h4>
+        <p>Install an npm package and add it to <code>plain.json</code> automatically. Try <code>plain add express</code>.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-hammer"></i></div>
+        <h4>plain build</h4>
+        <p>Compile to <code>.js</code> without executing. Inspect the generated JavaScript to understand what Plain does.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-play"></i></div>
+        <h4>plain run</h4>
+        <p>Compile and immediately execute a <code>.pln</code> file. The output is printed to the terminal as it runs.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-folder-plus"></i></div>
+        <h4>plain new</h4>
+        <p>Scaffold a new Plain project with <code>app.pln</code>, <code>plain.json</code>, and a <code>.gitignore</code> already set up.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- LANGUAGE TOUR                                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="language">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-book"></i> Language Reference</div>
+    <h2 class="section-title">Language Tour</h2>
+    <p class="section-lead">
+      A complete reference for every Plain construct. Every keyword compiles to a direct JavaScript equivalent — no magic, no hidden behaviour.
+    </p>
+
+    <!-- Variables -->
+    <h3 class="sub-heading"><i class="fa-solid fa-square-root-variable"></i> Variables</h3>
+    <p style="color:var(--muted);margin-bottom:.75rem">Declare with <code>remember … as</code>. Reassign with <code>becomes</code>.</p>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Plain</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> name  <span class="kw">as</span> <span class="str">"Ayokunle"</span>
+<span class="kw">remember</span> score <span class="kw">as</span> <span class="num">100</span>
+<span class="kw">remember</span> active <span class="kw">as</span> true
+
+score <span class="kw">becomes</span> score + <span class="num">10</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">JavaScript</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">let</span> name  = <span class="str">"Ayokunle"</span>;
+<span class="kw">let</span> score = <span class="num">100</span>;
+<span class="kw">let</span> active = <span class="kw">true</span>;
+
+score = score + <span class="num">10</span>;</code></pre>
+      </div>
+    </div>
+
+    <!-- Comparisons -->
+    <h3 class="sub-heading"><i class="fa-solid fa-scale-balanced"></i> Comparisons</h3>
+    <p style="color:var(--muted);margin-bottom:.75rem">Plain supports a full set of English comparison operators.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Plain</th><th>JavaScript</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>is</code> / <code>is equal to</code></td><td><code>===</code></td><td>Strict equality</td></tr>
+          <tr><td><code>is not</code></td><td><code>!==</code></td><td>Strict inequality</td></tr>
+          <tr><td><code>is greater than</code> / <code>is above</code></td><td><code>&gt;</code></td><td></td></tr>
+          <tr><td><code>is less than</code> / <code>is below</code></td><td><code>&lt;</code></td><td></td></tr>
+          <tr><td><code>is at least</code></td><td><code>&gt;=</code></td><td></td></tr>
+          <tr><td><code>is at most</code></td><td><code>&lt;=</code></td><td></td></tr>
+          <tr><td><code>is empty</code></td><td><code>.length === 0</code></td><td>Arrays and strings</td></tr>
+          <tr><td><code>is not empty</code></td><td><code>.length &gt; 0</code></td><td>Arrays and strings</td></tr>
+          <tr><td><code>contains "x"</code></td><td><code>.includes("x")</code></td><td></td></tr>
+          <tr><td><code>starts with "x"</code></td><td><code>.startsWith("x")</code></td><td></td></tr>
+          <tr><td><code>ends with "x"</code></td><td><code>.endsWith("x")</code></td><td></td></tr>
+          <tr><td><code>between A and B</code></td><td><code>&gt;= A &amp;&amp; &lt;= B</code></td><td>Inclusive range</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Control Flow -->
+    <h3 class="sub-heading"><i class="fa-solid fa-code-branch"></i> Control Flow</h3>
+    <div class="code-block" style="margin-bottom:2rem">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">control-flow.pln</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code><span class="cmt">// if / otherwise</span>
+<span class="kw">if</span> age <span class="kw">between</span> <span class="num">13</span> <span class="kw">and</span> <span class="num">19</span>
+    <span class="kw">show</span> <span class="str">"Teenager"</span>
+<span class="kw">otherwise</span>
+    <span class="kw">show</span> <span class="str">"Not a teenager"</span>
+<span class="kw">done</span>
+
+<span class="cmt">// while loop</span>
+<span class="kw">while</span> x <span class="kw">is above</span> <span class="num">0</span>
+    x <span class="kw">becomes</span> x <span class="op">-</span> <span class="num">1</span>
+<span class="kw">done</span>
+
+<span class="cmt">// for each loop</span>
+<span class="kw">for each</span> player <span class="kw">in</span> players
+    <span class="kw">show</span> player
+<span class="kw">done</span>
+
+<span class="cmt">// "for every" is an alias for "for each"</span>
+<span class="kw">for every</span> item <span class="kw">in</span> basket
+    <span class="kw">show</span> item
+<span class="kw">done</span></code></pre>
+    </div>
+
+    <!-- Functions -->
+    <h3 class="sub-heading"><i class="fa-solid fa-f"></i> Functions</h3>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Plain</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">make</span> <span class="fn">add</span>(a, b)
+    <span class="kw">give</span> a <span class="op">+</span> b
+<span class="kw">done</span>
+
+<span class="kw">make</span> <span class="fn">greet</span>(name)
+    <span class="kw">show</span> <span class="str">"Hello, "</span> + name
+<span class="kw">done</span>
+
+<span class="kw">show</span> <span class="fn">add</span>(<span class="num">5</span>, <span class="num">7</span>)   <span class="cmt">// 12</span>
+<span class="fn">greet</span>(<span class="str">"World"</span>)</code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">JavaScript</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">function</span> <span class="fn">add</span>(a, b) {
+    <span class="kw">return</span> a + b;
+}
+
+<span class="kw">function</span> <span class="fn">greet</span>(name) {
+    console.<span class="fn">log</span>(<span class="str">"Hello, "</span> + name);
+}
+
+console.<span class="fn">log</span>(<span class="fn">add</span>(<span class="num">5</span>, <span class="num">7</span>));   <span class="cmt">// 12</span>
+<span class="fn">greet</span>(<span class="str">"World"</span>);</code></pre>
+      </div>
+    </div>
+
+    <!-- Objects & Arrays -->
+    <h3 class="sub-heading"><i class="fa-solid fa-layer-group"></i> Objects &amp; Arrays</h3>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Plain</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> user <span class="kw">as</span>
+    name    <span class="kw">is</span> <span class="str">"Ayokunle"</span>
+    age     <span class="kw">is</span> <span class="num">17</span>
+    country <span class="kw">is</span> <span class="str">"Nigeria"</span>
+<span class="kw">done</span>
+
+<span class="kw">show</span> user.name
+user.age <span class="kw">becomes</span> <span class="num">18</span>
+
+<span class="kw">remember</span> scores <span class="kw">as</span> [<span class="num">90</span>, <span class="num">85</span>, <span class="num">92</span>]
+<span class="kw">show</span> scores[<span class="num">0</span>]
+scores[<span class="num">1</span>] <span class="kw">becomes</span> <span class="num">95</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">JavaScript</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">let</span> user = {
+    <span class="str">"name"</span>:    <span class="str">"Ayokunle"</span>,
+    <span class="str">"age"</span>:     <span class="num">17</span>,
+    <span class="str">"country"</span>: <span class="str">"Nigeria"</span>
+};
+
+console.<span class="fn">log</span>(user.name);
+user.age = <span class="num">18</span>;
+
+<span class="kw">let</span> scores = [<span class="num">90</span>, <span class="num">85</span>, <span class="num">92</span>];
+console.<span class="fn">log</span>(scores[<span class="num">0</span>]);
+scores[<span class="num">1</span>] = <span class="num">95</span>;</code></pre>
+      </div>
+    </div>
+
+    <!-- Imports -->
+    <h3 class="sub-heading"><i class="fa-solid fa-arrows-split-up-and-left"></i> Imports</h3>
+    <p style="color:var(--muted);margin-bottom:.75rem">Split a project across multiple <code>.pln</code> files using relative paths.</p>
+    <div class="code-block" style="margin-bottom:1rem">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">app.pln</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code><span class="kw">import</span> <span class="str">"./math.pln"</span>
+<span class="kw">import</span> <span class="str">"./utils.pln"</span>
+
+<span class="kw">show</span> <span class="fn">add</span>(<span class="num">3</span>, <span class="num">4</span>)</code></pre>
+    </div>
+    <div class="callout callout-info">
+      <i class="fa-solid fa-circle-info"></i>
+      <div class="callout-body">
+        <strong>Import rules</strong>
+        <p>Paths must be relative (<code>./</code> or <code>../</code>). Files compile in dependency order — deepest first. Circular imports produce a friendly compiler error.</p>
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <h3 class="sub-heading"><i class="fa-solid fa-comment"></i> Comments</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">Plain</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code><span class="cmt">// This is a single-line comment</span>
+<span class="kw">remember</span> x <span class="kw">as</span> <span class="num">42</span>  <span class="cmt">// inline comment</span>
+
+<span class="cmt">// note keyword is also available for block-level notes</span>
+<span class="kw">note</span> <span class="str">"This section handles user authentication"</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- EXAMPLES                                                                 -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="examples">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-terminal"></i> Examples</div>
+    <h2 class="section-title">Plain in action</h2>
+    <p class="section-lead">
+      Real programs written in Plain. Every example compiles to clean, readable JavaScript.
+    </p>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-list-check"></i> Conditions &amp; loops</h3>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">conditions.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> name  <span class="kw">as</span> <span class="str">"Ayokunle"</span>
+<span class="kw">remember</span> age   <span class="kw">as</span> <span class="num">17</span>
+<span class="kw">remember</span> score <span class="kw">as</span> <span class="num">85</span>
 
 <span class="kw">if</span> age <span class="kw">is at least</span> <span class="num">18</span>
     <span class="kw">show</span> <span class="str">"Adult"</span>
@@ -251,353 +630,822 @@
     <span class="kw">show</span> <span class="str">"Teenager"</span>
 <span class="kw">done</span>
 
-<span class="kw">for every</span> i <span class="kw">in</span> players
-    <span class="fn">print</span>(i)
+<span class="kw">if</span> score <span class="kw">between</span> <span class="num">80</span> <span class="kw">and</span> <span class="num">100</span>
+    <span class="kw">show</span> <span class="str">"Distinction"</span>
 <span class="kw">done</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">loops.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> players <span class="kw">as</span> [
+    <span class="str">"Haaland"</span>,
+    <span class="str">"Foden"</span>,
+    <span class="str">"Rodri"</span>
+]
+
+<span class="kw">for each</span> player <span class="kw">in</span> players
+    <span class="kw">show</span> <span class="str">"Player: "</span> + player
+<span class="kw">done</span>
+
+<span class="kw">remember</span> count <span class="kw">as</span> <span class="num">0</span>
+<span class="kw">while</span> count <span class="kw">is below</span> <span class="num">5</span>
+    count <span class="kw">becomes</span> count + <span class="num">1</span>
+<span class="kw">done</span></code></pre>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-globe"></i> Fetch &amp; stdlib</h3>
+    <div class="code-block" style="margin-bottom:2rem">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">stdlib.pln</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code><span class="cmt">// Built-in functions — no imports needed</span>
+<span class="kw">remember</span> id   <span class="kw">as</span> <span class="fn">uuid</span>()
+<span class="kw">remember</span> now  <span class="kw">as</span> <span class="fn">date</span>()
+<span class="kw">remember</span> name <span class="kw">as</span> <span class="fn">uppercase</span>(<span class="str">"plain"</span>)
+
+<span class="kw">show</span> id
+<span class="kw">show</span> now
+<span class="kw">show</span> name   <span class="cmt">// "PLAIN"</span>
+
+<span class="kw">remember</span> config <span class="kw">as</span> <span class="fn">jsonDecode</span>(<span class="fn">readFile</span>(<span class="str">"./config.json"</span>))
+<span class="kw">show</span> config.version</code></pre>
+    </div>
   </div>
-  <div class="code-card">
-    <div class="label">Generated JavaScript</div>
-    <pre><code><span class="kw">const</span> name = <span class="str">"Ayokunle"</span>;
-<span class="kw">const</span> age  = <span class="num">17</span>;
+</section>
 
-<span class="kw">if</span> (age >= <span class="num">18</span>) {
-    console.<span class="fn">log</span>(<span class="str">"Adult"</span>);
-} <span class="kw">else</span> {
-    console.<span class="fn">log</span>(<span class="str">"Teenager"</span>);
-}
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- STANDARD LIBRARY                                                         -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="stdlib">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-box"></i> Standard Library</div>
+    <h2 class="section-title">Built-in Functions</h2>
+    <p class="section-lead">
+      All standard library functions are available without any <code>use</code> or import statement. No configuration needed.
+    </p>
 
-<span class="kw">for</span> (<span class="kw">const</span> i <span class="kw">of</span> players) {
-    console.<span class="fn">log</span>(i);
+    <div class="callout callout-tip">
+      <i class="fa-solid fa-circle-check"></i>
+      <div class="callout-body">
+        <strong>Always available</strong>
+        <p>Unlike npm packages, stdlib functions never need to be installed. Just call them directly in any <code>.pln</code> file.</p>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-terminal"></i> I/O &amp; System</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plain</th><th>Compiles to</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>print(x)</code></td><td><code>console.log(x)</code></td><td>Print a value to stdout</td></tr>
+          <tr><td><code>show x</code></td><td><code>console.log(x)</code></td><td>Print a value (statement form)</td></tr>
+          <tr><td><code>env("KEY")</code></td><td><code>process.env["KEY"]</code></td><td>Read an environment variable</td></tr>
+          <tr><td><code>exit(code)</code></td><td><code>process.exit(code)</code></td><td>Exit the process with a code</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-file"></i> Files</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plain</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>readFile("path")</code></td><td>Read a file as UTF-8 text (synchronous)</td></tr>
+          <tr><td><code>writeFile("path", content)</code></td><td>Write text to a file (synchronous)</td></tr>
+          <tr><td><code>fileExists("path")</code></td><td>Check if a file exists — returns <code>true</code> or <code>false</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-clock"></i> Time &amp; Utilities</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+        <tbody>
+          <tr><td><code>time()</code></td><td><code>Date.now()</code> — milliseconds since epoch</td></tr>
+          <tr><td><code>date()</code></td><td><code>new Date().toISOString()</code></td></tr>
+          <tr><td><code>sleep(ms)</code></td><td>Synchronous sleep via <code>Atomics.wait</code></td></tr>
+          <tr><td><code>uuid()</code></td><td><code>require('crypto').randomUUID()</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-code"></i> JSON</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+        <tbody>
+          <tr><td><code>jsonEncode(value)</code></td><td><code>JSON.stringify(value)</code></td></tr>
+          <tr><td><code>jsonDecode(string)</code></td><td><code>JSON.parse(string)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-font"></i> Strings &amp; Numbers</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plain</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>length(x)</code></td><td>Length of a string or array</td></tr>
+          <tr><td><code>uppercase(x)</code></td><td>Convert string to uppercase</td></tr>
+          <tr><td><code>lowercase(x)</code></td><td>Convert string to lowercase</td></tr>
+          <tr><td><code>round(x)</code></td><td>Round number to nearest integer</td></tr>
+          <tr><td><code>random()</code></td><td>Random float between 0 and 1 — equivalent to <code>Math.random()</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- PACKAGES                                                                 -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="packages">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-cubes"></i> Package System</div>
+    <h2 class="section-title">npm, without the boilerplate</h2>
+    <p class="section-lead">
+      Plain wraps npm's package manager to keep dependency management natural and minimal. Any npm package can be used in a Plain project.
+    </p>
+
+    <div class="two-col" style="margin-bottom:2rem">
+      <div>
+        <h3 class="sub-heading"><i class="fa-solid fa-terminal"></i> Package commands</h3>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain add</span> <span class="arg">express</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain remove</span> <span class="arg">express</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain install</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain update</span></div>
+
+        <h3 class="sub-heading" style="margin-top:1.5rem"><i class="fa-solid fa-file-code"></i> plain.json</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <div class="code-block-dots"><span></span><span></span><span></span></div>
+            <span class="code-block-title">plain.json</span>
+            <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+          </div>
+          <pre><code>{
+    <span class="str">"name"</span>: <span class="str">"my-app"</span>,
+    <span class="str">"version"</span>: <span class="str">"0.1.0"</span>,
+    <span class="str">"entry"</span>: <span class="str">"app.pln"</span>,
+    <span class="str">"dependencies"</span>: {
+        <span class="str">"express"</span>: <span class="str">"^4.18.2"</span>
+    }
 }</code></pre>
-  </div>
-</div>
+        </div>
+      </div>
+      <div>
+        <h3 class="sub-heading"><i class="fa-solid fa-plug"></i> Supported packages</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+            <tbody>
+              <tr><td><code>use express</code></td><td><code>const express = require('express')</code></td></tr>
+              <tr><td><code>use sqlite</code></td><td><code>const Database = require('better-sqlite3')</code></td></tr>
+              <tr><td><code>use fs</code></td><td><code>const fs = require('fs')</code></td></tr>
+              <tr><td><code>use path</code></td><td><code>const path = require('path')</code></td></tr>
+            </tbody>
+          </table>
+        </div>
 
-<!-- ── Quick Start ─────────────────────────────────────────────────────────── -->
-<section id="quickstart">
-  <div class="section-label">Setup</div>
-  <h2>Quick Start</h2>
-  <p>Plain compiles <code>.pln</code> files to JavaScript and runs them with Node.js. No configuration required.</p>
-
-  <div class="install-strip">
-    <span>Install globally via npm</span>
-    <code class="install-cmd">npm install -g @ayoxx/plain-code</code>
-  </div>
-
-  <div class="code-card" style="margin-bottom:1rem">
-    <div class="label">Create a project</div>
-    <pre><code>plain new myapp
-cd myapp
-plain install
-plain run app.pln</code></pre>
-  </div>
-
-  <div class="feature-grid">
-    <div class="feature-card">
-      <div class="icon">🔍</div>
-      <h4>plain check</h4>
-      <p>Validate syntax without running. Great for CI pipelines.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">✨</div>
-      <h4>plain fmt</h4>
-      <p>Auto-format your <code>.pln</code> file with consistent indentation and spacing.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">📦</div>
-      <h4>plain add</h4>
-      <p>Install npm packages and record them in <code>plain.json</code>.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">🔨</div>
-      <h4>plain build</h4>
-      <p>Compile to <code>.js</code> without executing — inspect the output.</p>
+        <div class="callout callout-warning" style="margin-top:1rem">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <div class="callout-body">
+            <strong>Dependency validation</strong>
+            <p>Before compiling, Plain checks that every package referenced by <code>use</code> is installed. Missing packages produce a friendly error with the exact command to fix it.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ── Language ──────────────────────────────────────────────────────────── -->
-<section id="language">
-  <div class="section-label">Language Reference</div>
-  <h2>Language Features</h2>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- WEB DEVELOPMENT                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="web">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-globe"></i> Web Development</div>
+    <h2 class="section-title">Express Developer Experience</h2>
+    <p class="section-lead">
+      Two styles of web server — choose the one that fits your mental model. Both compile to identical Express.js code.
+    </p>
 
-  <h3>Variables</h3>
-  <div class="code-card" style="margin-bottom:1.5rem">
-    <pre><code><span class="kw">remember</span> name <span class="kw">as</span> <span class="str">"Ayokunle"</span>
-<span class="kw">remember</span> score <span class="kw">as</span> <span class="num">100</span>
-score <span class="kw">becomes</span> score + <span class="num">10</span></code></pre>
-  </div>
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Shorthand style — v1.0</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">web app</span>
 
-  <h3>Comparisons</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>JavaScript</th></tr></thead>
-    <tbody>
-      <tr><td><code>is equal to</code> / <code>is</code></td><td><code>===</code></td></tr>
-      <tr><td><code>is not</code></td><td><code>!==</code></td></tr>
-      <tr><td><code>is greater than</code> / <code>is above</code></td><td><code>&gt;</code></td></tr>
-      <tr><td><code>is less than</code> / <code>is below</code></td><td><code>&lt;</code></td></tr>
-      <tr><td><code>is at least</code></td><td><code>&gt;=</code></td></tr>
-      <tr><td><code>is at most</code></td><td><code>&lt;=</code></td></tr>
-      <tr><td><code>is empty</code></td><td><code>.length === 0</code></td></tr>
-      <tr><td><code>is not empty</code></td><td><code>.length &gt; 0</code></td></tr>
-      <tr><td><code>contains "x"</code></td><td><code>.includes("x")</code></td></tr>
-      <tr><td><code>starts with "x"</code></td><td><code>.startsWith("x")</code></td></tr>
-      <tr><td><code>ends with "x"</code></td><td><code>.endsWith("x")</code></td></tr>
-      <tr><td><code>between A and B</code></td><td><code>&gt;= A &amp;&amp; &lt;= B</code></td></tr>
-    </tbody>
-  </table>
-
-  <h3>Control flow</h3>
-  <div class="code-card" style="margin-bottom:1.5rem">
-    <pre><code><span class="kw">if</span> age <span class="kw">between</span> <span class="num">13</span> <span class="kw">and</span> <span class="num">19</span>
-    <span class="kw">show</span> <span class="str">"Teenager"</span>
-<span class="kw">otherwise</span>
-    <span class="kw">show</span> <span class="str">"Not a teenager"</span>
-<span class="kw">done</span>
-
-<span class="kw">while</span> x <span class="kw">is above</span> <span class="num">0</span>
-    x <span class="kw">becomes</span> x <span class="op">-</span> <span class="num">1</span>
-<span class="kw">done</span>
-
-<span class="kw">for every</span> item <span class="kw">in</span> basket   <span class="cmt">// alias for "for each"</span>
-    <span class="kw">show</span> item
-<span class="kw">done</span></code></pre>
-  </div>
-
-  <h3>Functions</h3>
-  <div class="code-card" style="margin-bottom:1.5rem">
-    <pre><code><span class="kw">make</span> <span class="fn">add</span>(a, b)
-    <span class="kw">give</span> a <span class="op">+</span> b
-<span class="kw">done</span>
-
-<span class="kw">show</span> <span class="fn">add</span>(<span class="num">5</span>, <span class="num">7</span>)   <span class="cmt">// 12</span></code></pre>
-  </div>
-
-  <h3>Objects &amp; Arrays</h3>
-  <div class="code-card">
-    <pre><code><span class="kw">remember</span> user <span class="kw">as</span>
-    name <span class="kw">is</span> <span class="str">"Ayokunle"</span>
-    age  <span class="kw">is</span> <span class="num">17</span>
-<span class="kw">done</span>
-
-<span class="kw">remember</span> scores <span class="kw">as</span> [<span class="num">90</span>, <span class="num">85</span>, <span class="num">92</span>]
-<span class="kw">show</span> scores[<span class="num">0</span>]</code></pre>
-  </div>
-</section>
-
-<!-- ── Stdlib ─────────────────────────────────────────────────────────────── -->
-<section id="stdlib">
-  <div class="section-label">Standard Library</div>
-  <h2>Built-in Functions</h2>
-  <p>All standard library functions are available without any <code>use</code> or import statement.</p>
-
-  <h3>I/O &amp; System</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>Compiles to</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><code>print(x)</code></td><td><code>console.log(x)</code></td><td>Print a value</td></tr>
-      <tr><td><code>show x</code></td><td><code>console.log(x)</code></td><td>Print a value (statement form)</td></tr>
-      <tr><td><code>env("KEY")</code></td><td><code>process.env["KEY"]</code></td><td>Read an environment variable</td></tr>
-      <tr><td><code>exit(code)</code></td><td><code>process.exit(code)</code></td><td>Exit the process</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Files</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><code>readFile("path")</code></td><td>Read a file as UTF-8 text</td></tr>
-      <tr><td><code>writeFile("path", content)</code></td><td>Write text to a file</td></tr>
-      <tr><td><code>fileExists("path")</code></td><td>Check if a file exists (returns true/false)</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Time &amp; Utilities</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
-    <tbody>
-      <tr><td><code>time()</code></td><td><code>Date.now()</code></td></tr>
-      <tr><td><code>date()</code></td><td><code>new Date().toISOString()</code></td></tr>
-      <tr><td><code>sleep(ms)</code></td><td>Synchronous sleep via <code>Atomics.wait</code></td></tr>
-      <tr><td><code>uuid()</code></td><td><code>require('crypto').randomUUID()</code></td></tr>
-    </tbody>
-  </table>
-
-  <h3>JSON</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
-    <tbody>
-      <tr><td><code>jsonEncode(value)</code></td><td><code>JSON.stringify(value)</code></td></tr>
-      <tr><td><code>jsonDecode(string)</code></td><td><code>JSON.parse(string)</code></td></tr>
-    </tbody>
-  </table>
-
-  <h3>Strings &amp; Numbers</h3>
-  <table>
-    <thead><tr><th>Plain</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><code>length(x)</code></td><td>Length of array or string</td></tr>
-      <tr><td><code>uppercase(x)</code></td><td>Convert to uppercase</td></tr>
-      <tr><td><code>lowercase(x)</code></td><td>Convert to lowercase</td></tr>
-      <tr><td><code>round(x)</code></td><td>Round to nearest integer</td></tr>
-      <tr><td><code>random()</code></td><td>Random number 0–1</td></tr>
-    </tbody>
-  </table>
-</section>
-
-<!-- ── Web ───────────────────────────────────────────────────────────────── -->
-<section id="web">
-  <div class="section-label">Web Apps</div>
-  <h2>Express Developer Experience</h2>
-  <p>Two styles — choose the one that fits your needs.</p>
-
-  <div class="compare">
-    <div class="code-card">
-      <div class="label">v1.0 shorthand</div>
-      <pre><code><span class="kw">web app</span>
+<span class="kw">serve folder</span> <span class="str">"public"</span>
 
 <span class="kw">route</span> <span class="str">"/"</span>
-    <span class="kw">reply</span> <span class="str">"Hello!"</span>
+    <span class="kw">reply</span> <span class="str">"Hello from Plain!"</span>
 <span class="kw">done</span>
 
 <span class="kw">route</span> <span class="str">"/api/status"</span>
+    <span class="kw">reply json</span>
+        status  <span class="kw">is</span> <span class="str">"ok"</span>
+        version <span class="kw">is</span> <span class="str">"1.0"</span>
+    <span class="kw">done</span>
+<span class="kw">done</span>
+
+<span class="kw">start</span> <span class="num">3000</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Classic style — still supported</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">use</span> express
+
+<span class="kw">remember</span> app <span class="kw">as</span> <span class="fn">express</span>()
+
+<span class="kw">serve folder</span> <span class="str">"public"</span>
+
+<span class="kw">when someone visits</span> <span class="str">"/"</span>
+    <span class="kw">reply</span> <span class="str">"Hello from Plain!"</span>
+<span class="kw">done</span>
+
+<span class="kw">when someone visits</span> <span class="str">"/api/status"</span>
     <span class="kw">reply json</span>
         status <span class="kw">is</span> <span class="str">"ok"</span>
     <span class="kw">done</span>
 <span class="kw">done</span>
 
-<span class="kw">start</span> <span class="num">3000</span></code></pre>
-    </div>
-    <div class="code-card">
-      <div class="label">Classic style (still works)</div>
-      <pre><code><span class="kw">use</span> express
-
-<span class="kw">remember</span> app <span class="kw">as</span> <span class="fn">express</span>()
-
-<span class="kw">when someone visits</span> <span class="str">"/"</span>
-    <span class="kw">reply</span> <span class="str">"Hello!"</span>
-<span class="kw">done</span>
-
 <span class="kw">listen on</span> <span class="num">3000</span>
-    <span class="kw">show</span> <span class="str">"Running"</span>
+    <span class="kw">show</span> <span class="str">"Server running"</span>
 <span class="kw">done</span></code></pre>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-table-list"></i> Route reference</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Construct</th><th>Compiles to</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>web app</code></td><td><code>const app = require('express')()</code></td><td>Shorthand bootstrapper</td></tr>
+          <tr><td><code>route "/"</code></td><td><code>app.get("/", (req, res) =&gt; { ... })</code></td><td>GET route</td></tr>
+          <tr><td><code>when someone visits "/"</code></td><td><code>app.get("/", (req, res) =&gt; { ... })</code></td><td>Classic alias</td></tr>
+          <tr><td><code>reply "Hello"</code></td><td><code>res.send("Hello")</code></td><td></td></tr>
+          <tr><td><code>reply json … done</code></td><td><code>res.json({ ... })</code></td><td></td></tr>
+          <tr><td><code>serve folder "public"</code></td><td><code>app.use(express.static("public"))</code></td><td></td></tr>
+          <tr><td><code>start 3000</code></td><td><code>app.listen(3000)</code></td><td>Shorthand</td></tr>
+          <tr><td><code>listen on 3000 … done</code></td><td><code>app.listen(3000, () =&gt; { ... })</code></td><td>Classic with callback</td></tr>
+          <tr><td><code>request</code></td><td><code>req</code></td><td>Inside route bodies</td></tr>
+          <tr><td><code>response</code></td><td><code>res</code></td><td>Inside route bodies</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
 
-<!-- ── Database ──────────────────────────────────────────────────────────── -->
-<section id="database">
-  <div class="section-label">Database</div>
-  <h2>SQLite Developer Experience</h2>
-  <p>Inline SQL blocks compile to <code>better-sqlite3</code> calls — no ORM, just SQL written naturally.</p>
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- SQLITE                                                                   -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="database">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-database"></i> Database</div>
+    <h2 class="section-title">SQLite Developer Experience</h2>
+    <p class="section-lead">
+      Inline SQL blocks compile directly to <code>better-sqlite3</code> calls. No ORM. No query builder. Just SQL written naturally inside your Plain program.
+    </p>
 
-  <div class="code-card" style="margin-bottom:1rem">
-    <div class="label">database.pln</div>
-    <pre><code><span class="kw">database</span> <span class="str">"app.db"</span>
+    <div class="two-col-wide" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">database.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">database</span> <span class="str">"app.db"</span>
 
 <span class="kw">execute</span>
     CREATE TABLE IF NOT EXISTS users (
         id   INTEGER PRIMARY KEY,
-        name TEXT NOT NULL
+        name TEXT NOT NULL,
+        age  INTEGER
     )
 <span class="kw">done</span>
 
 <span class="kw">insert</span>
-    INSERT INTO users (name) VALUES (<span class="str">'Alice'</span>)
+    INSERT INTO users (name, age)
+    VALUES ('Alice', 28)
 <span class="kw">done</span>
 
 <span class="kw">query</span>
-    SELECT * FROM users
+    SELECT * FROM users ORDER BY name
+<span class="kw">done</span>
+
+<span class="kw">update</span>
+    UPDATE users SET age = 29
+    WHERE name = 'Alice'
+<span class="kw">done</span>
+
+<span class="kw">delete</span>
+    DELETE FROM users WHERE id = 1
 <span class="kw">done</span></code></pre>
-  </div>
+      </div>
+      <div>
+        <h3 class="sub-heading" style="margin-top:0"><i class="fa-solid fa-table-list"></i> SQL block reference</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
+            <tbody>
+              <tr><td><code>database "file.db"</code></td><td><code>const db = new Database("file.db")</code></td></tr>
+              <tr><td><code>query … done</code></td><td><code>db.prepare(`…`).all()</code></td></tr>
+              <tr><td><code>insert … done</code></td><td><code>db.prepare(`…`).run()</code></td></tr>
+              <tr><td><code>update … done</code></td><td><code>db.prepare(`…`).run()</code></td></tr>
+              <tr><td><code>delete … done</code></td><td><code>db.prepare(`…`).run()</code></td></tr>
+              <tr><td><code>execute … done</code></td><td><code>db.exec(`…`)</code></td></tr>
+            </tbody>
+          </table>
+        </div>
 
-  <table>
-    <thead><tr><th>Plain</th><th>Compiles to</th></tr></thead>
-    <tbody>
-      <tr><td><code>database "file.db"</code></td><td><code>const db = new Database("file.db")</code></td></tr>
-      <tr><td><code>query ... done</code></td><td><code>db.prepare(`...`).all()</code></td></tr>
-      <tr><td><code>insert ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
-      <tr><td><code>update ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
-      <tr><td><code>delete ... done</code></td><td><code>db.prepare(`...`).run()</code></td></tr>
-      <tr><td><code>execute ... done</code></td><td><code>db.exec(`...`)</code></td></tr>
-    </tbody>
-  </table>
-</section>
+        <div class="callout callout-info" style="margin-top:1.25rem">
+          <i class="fa-solid fa-circle-info"></i>
+          <div class="callout-body">
+            <strong>Classic style also works</strong>
+            <p>You can also <code>use sqlite</code> and call <code>sqlite("database.db")</code> directly if you prefer the classic approach.</p>
+          </div>
+        </div>
 
-<!-- ── CLI ──────────────────────────────────────────────────────────────── -->
-<section id="cli">
-  <div class="section-label">CLI Reference</div>
-  <h2>All Commands</h2>
-
-  <table>
-    <thead><tr><th>Command</th><th>Description</th></tr></thead>
-    <tbody>
-      <tr><td><code>plain run &lt;file.pln&gt;</code></td><td>Compile and execute</td></tr>
-      <tr><td><code>plain build &lt;file.pln&gt;</code></td><td>Compile to <code>.js</code> without running</td></tr>
-      <tr><td><code>plain check &lt;file.pln&gt;</code></td><td>Syntax check only</td></tr>
-      <tr><td><code>plain fmt &lt;file.pln&gt;</code></td><td>Format in-place</td></tr>
-      <tr><td><code>plain new [name]</code></td><td>Create a new project</td></tr>
-      <tr><td><code>plain init</code></td><td>Create <code>plain.json</code> in current directory</td></tr>
-      <tr><td><code>plain install</code></td><td>Install dependencies from <code>plain.json</code></td></tr>
-      <tr><td><code>plain add &lt;pkg&gt;</code></td><td>Install a package and add to <code>plain.json</code></td></tr>
-      <tr><td><code>plain remove &lt;pkg&gt;</code></td><td>Remove a package</td></tr>
-      <tr><td><code>plain update</code></td><td>Update all installed packages</td></tr>
-      <tr><td><code>plain version</code></td><td>Print compiler version</td></tr>
-      <tr><td><code>plain help</code></td><td>Show help text</td></tr>
-    </tbody>
-  </table>
-
-  <h3 style="margin-top:1.5rem">CLI Output (v1.0)</h3>
-  <div class="code-card">
-    <div class="label">Terminal</div>
-    <pre><code>$ plain run app.pln
-<span class="kw">✓</span> tokenize
-<span class="kw">✓</span> parse
-<span class="kw">✓</span> generate
-<span class="kw">✓</span> run
-
-$ plain check app.pln
-<span class="kw">✓</span> app.pln — no errors found. (3ms)
-
-$ plain fmt app.pln
-<span class="kw">✓</span> Formatted app.pln</code></pre>
-  </div>
-</section>
-
-<!-- ── VS Code ───────────────────────────────────────────────────────────── -->
-<section>
-  <div class="section-label">Editor</div>
-  <h2>VS Code Extension</h2>
-  <p>The <strong>Plain Language</strong> extension provides syntax highlighting, snippets, bracket matching, and code folding for <code>.pln</code> files.</p>
-
-  <div class="feature-grid">
-    <div class="feature-card">
-      <div class="icon">🎨</div>
-      <h4>Syntax Highlighting</h4>
-      <p>All keywords, strings, numbers, operators, and stdlib functions coloured.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">⚡</div>
-      <h4>Snippets</h4>
-      <p>Type <code>if</code>, <code>make</code>, <code>webapp</code>, <code>route</code>, <code>foreach</code>, and more — press Tab to expand.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">📁</div>
-      <h4>File Icon</h4>
-      <p>Custom file icon for <code>.pln</code> files in the explorer sidebar.</p>
-    </div>
-    <div class="feature-card">
-      <div class="icon">🔧</div>
-      <h4>Language Config</h4>
-      <p>Auto-closing brackets, comment toggling (<code>//</code>), and <code>done</code>-based block folding.</p>
+        <div class="callout callout-tip" style="margin-top:.75rem">
+          <i class="fa-solid fa-circle-check"></i>
+          <div class="callout-body">
+            <strong>Zero configuration</strong>
+            <p>SQLite files are created automatically if they don&rsquo;t exist. No server to start, no credentials to manage.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-</div><!-- /page -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- CLI                                                                      -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="cli">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-terminal"></i> CLI Reference</div>
+    <h2 class="section-title">All Commands</h2>
+    <p class="section-lead">
+      Everything the Plain compiler can do, from a single unified CLI.
+    </p>
 
-<footer>
-  Plain v1.0 · MIT License · Built with intent
+    <div class="two-col-wide" style="margin-bottom:2rem">
+      <div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Command</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><code>plain run &lt;file.pln&gt;</code></td><td>Compile and execute immediately</td></tr>
+              <tr><td><code>plain build &lt;file.pln&gt;</code></td><td>Compile to <code>.js</code> without running</td></tr>
+              <tr><td><code>plain check &lt;file.pln&gt;</code></td><td>Syntax check — exits 0 or 1</td></tr>
+              <tr><td><code>plain fmt &lt;file.pln&gt;</code></td><td>Format source in-place</td></tr>
+              <tr><td><code>plain new [name]</code></td><td>Scaffold a new project</td></tr>
+              <tr><td><code>plain init</code></td><td>Create <code>plain.json</code> in current directory</td></tr>
+              <tr><td><code>plain install</code></td><td>Install all dependencies from <code>plain.json</code></td></tr>
+              <tr><td><code>plain add &lt;pkg&gt;</code></td><td>Install a package and record it</td></tr>
+              <tr><td><code>plain remove &lt;pkg&gt;</code></td><td>Uninstall a package</td></tr>
+              <tr><td><code>plain update</code></td><td>Update all installed packages</td></tr>
+              <tr><td><code>plain version</code></td><td>Print the compiler version</td></tr>
+              <tr><td><code>plain help</code></td><td>Show help text</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="sub-heading" style="margin-top:0"><i class="fa-solid fa-rectangle-terminal"></i> CLI output</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <div class="code-block-dots"><span></span><span></span><span></span></div>
+            <span class="code-block-title">Terminal</span>
+            <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+          </div>
+          <pre><code><span class="prm">$</span> plain run app.pln
+<span class="ok">✓</span> tokenize
+<span class="ok">✓</span> parse
+<span class="ok">✓</span> generate
+<span class="ok">✓</span> run
+Done.
+
+<span class="prm">$</span> plain check app.pln
+<span class="ok">✓</span> app.pln — no errors found. (3ms)
+
+<span class="prm">$</span> plain fmt app.pln
+<span class="ok">✓</span> Formatted app.pln
+
+<span class="prm">$</span> plain version
+Plain v1.0.0</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- FORMATTER                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="formatter">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-paintbrush"></i> Formatter</div>
+    <h2 class="section-title">Automatic Code Formatting</h2>
+    <p class="section-lead">
+      <code>plain fmt</code> formats your <code>.pln</code> file in-place. One command, no options — consistent code across every project.
+    </p>
+
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">Before formatting</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span>   x <span class="kw">as</span>  <span class="num">10</span>
+<span class="kw">if</span> x <span class="kw">is above</span> <span class="num">5</span>
+<span class="kw">show</span> <span class="str">"big"</span>
+
+<span class="kw">otherwise</span>
+  <span class="kw">show</span> <span class="str">"small"</span>
+<span class="kw">done</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">After plain fmt</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> x <span class="kw">as</span> <span class="num">10</span>
+
+<span class="kw">if</span> x <span class="kw">is above</span> <span class="num">5</span>
+    <span class="kw">show</span> <span class="str">"big"</span>
+<span class="kw">otherwise</span>
+    <span class="kw">show</span> <span class="str">"small"</span>
+<span class="kw">done</span></code></pre>
+      </div>
+    </div>
+
+    <h3 class="sub-heading"><i class="fa-solid fa-list"></i> Formatting rules</h3>
+    <div class="feature-grid" style="margin-top:1rem">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-indent"></i></div>
+        <h4>4-space indentation</h4>
+        <p>All block bodies — <code>if</code>, <code>while</code>, <code>for each</code>, <code>make</code>, <code>route</code> — are indented with exactly 4 spaces.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-text-slash"></i></div>
+        <h4>Trailing whitespace removed</h4>
+        <p>Every line has trailing spaces stripped. The file ends with exactly one newline.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-arrows-up-down"></i></div>
+        <h4>Blank lines normalised</h4>
+        <p>One blank line between top-level blocks. Multiple consecutive blank lines are collapsed into one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- VS CODE                                                                  -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="vscode">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-code"></i> Editor</div>
+    <h2 class="section-title">VS Code Extension</h2>
+    <p class="section-lead">
+      The <strong>Plain Language</strong> extension brings first-class <code>.pln</code> support to VS Code — syntax highlighting, smart snippets, bracket matching, and code folding.
+    </p>
+
+    <div class="feature-grid" style="margin-bottom:2rem">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-palette"></i></div>
+        <h4>Syntax Highlighting</h4>
+        <p>All keywords, strings, numbers, operators, comments, and stdlib functions are coloured correctly.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-bolt"></i></div>
+        <h4>Snippets</h4>
+        <p>Type <kbd>if</kbd>, <kbd>make</kbd>, <kbd>webapp</kbd>, <kbd>route</kbd>, <kbd>foreach</kbd>, and more — press <kbd>Tab</kbd> to expand.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-file"></i></div>
+        <h4>File Icon</h4>
+        <p>Custom file icon for <code>.pln</code> files in the VS Code explorer sidebar.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+        <h4>Language Config</h4>
+        <p>Auto-closing brackets, comment toggling (<kbd>Ctrl</kbd>+<kbd>/</kbd>), and <code>done</code>-based block folding.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <i class="fa-solid fa-circle-info"></i>
+      <div class="callout-body">
+        <strong>Installation</strong>
+        <p>Install via the VS Code Extensions panel (search <em>Plain Language</em>) or by downloading the <code>.vsix</code> file from the GitHub releases page and running <code>code --install-extension plain-language-1.0.0.vsix</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- ROADMAP                                                                  -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="roadmap">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-map"></i> Roadmap</div>
+    <h2 class="section-title">What&rsquo;s next</h2>
+    <p class="section-lead">
+      Plain 1.0.0 is the first stable release. Here&rsquo;s what&rsquo;s planned for the versions that follow.
+    </p>
+
+    <div class="roadmap">
+
+      <div class="roadmap-item">
+        <div class="roadmap-version">v1.0</div>
+        <div class="roadmap-line-wrap">
+          <div class="roadmap-dot done"></div>
+          <div class="roadmap-connector"></div>
+        </div>
+        <div class="roadmap-content">
+          <h4>v1.0.0 — Stable <span class="badge badge-green" style="margin-left:.5rem"><i class="fa-solid fa-check"></i> Released</span></h4>
+          <ul>
+            <li>Compiler audit — all constructs verified</li>
+            <li>257 passing tests</li>
+            <li>Full language specification</li>
+            <li>VS Code extension v1.0.0</li>
+            <li>GitHub Linguist preparation</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-version">v1.1</div>
+        <div class="roadmap-line-wrap">
+          <div class="roadmap-dot"></div>
+          <div class="roadmap-connector"></div>
+        </div>
+        <div class="roadmap-content">
+          <h4>v1.1 — Developer Experience <span class="badge badge-blue" style="margin-left:.5rem">Planned</span></h4>
+          <ul>
+            <li><code>plain watch</code> — recompile on file change</li>
+            <li>Error recovery mode — continue parsing after first error</li>
+            <li>Improved error messages with source-map line numbers</li>
+            <li>Multi-file project support improvements</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-version">v1.2</div>
+        <div class="roadmap-line-wrap">
+          <div class="roadmap-dot"></div>
+          <div class="roadmap-connector"></div>
+        </div>
+        <div class="roadmap-content">
+          <h4>v1.2 — Editor Integration <span class="badge badge-blue" style="margin-left:.5rem">Planned</span></h4>
+          <ul>
+            <li>Language Server Protocol (LSP) support</li>
+            <li>Hover documentation in VS Code</li>
+            <li>Go-to-definition for functions</li>
+            <li>Inline error squiggles</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-version">v2.0</div>
+        <div class="roadmap-line-wrap">
+          <div class="roadmap-dot"></div>
+        </div>
+        <div class="roadmap-content">
+          <h4>v2.0 — Extended Language <span class="badge badge-amber" style="margin-left:.5rem">Future</span></h4>
+          <ul>
+            <li>Optional type hints (non-breaking)</li>
+            <li>Async operations</li>
+            <li>Standard library expansion</li>
+            <li>Module system refinements</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- FAQ                                                                      -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="faq">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-circle-question"></i> FAQ</div>
+    <h2 class="section-title">Frequently Asked Questions</h2>
+
+    <div class="faq">
+
+      <div class="faq-item">
+        <button class="faq-question">What is Plain? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Plain is an Intent-Oriented Programming Language (IOPL). It compiles <code>.pln</code> source files to JavaScript and runs them with Node.js. Plain's design goal is to let developers describe <em>what</em> they want to happen in near-English sentences, while the compiler handles the JavaScript implementation details.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">Is Plain production-ready? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Plain 1.0.0 is the first stable release. It has a full test suite (257 tests), a complete language specification, and compiles to standard Node.js-compatible JavaScript. It is well-suited for personal projects, tooling, and learning. For large production systems, evaluate whether the JavaScript ecosystem's tooling (TypeScript, linters, bundlers) is needed alongside it.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">Does Plain support TypeScript? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Not in v1.0. Plain compiles to plain JavaScript. Optional type hints are planned for v2.0, but they will be designed to stay readable in Plain's English-sentence style — not to mirror TypeScript syntax.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">Can I use npm packages? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Yes. Any npm package can be declared with <code>use &lt;package&gt;</code> and installed with <code>plain add &lt;package&gt;</code>. Plain manages your <code>plain.json</code> and the underlying <code>node_modules</code> automatically. The compiler validates that all declared packages are installed before compiling.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">What&rsquo;s the difference between <code>for each</code> and <code>for every</code>? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          They are identical. Both compile to a <code>for...of</code> JavaScript loop. <code>for every</code> is provided as an alias because it reads naturally in certain sentences — e.g. <em>for every item in basket</em>. In Plain, there is never a functional difference between the two.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">How do I debug Plain code? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Use <code>plain build app.pln</code> to compile to <code>app.js</code> and inspect the generated JavaScript. Since the output is clean, readable JS you can open it in any Node.js debugger, add <code>console.log</code> statements, or run it directly with <code>node app.js</code>. You can also use <code>plain check app.pln</code> to catch syntax errors before running.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-question">Does Plain work on Windows? <i class="fa-solid fa-chevron-down"></i></button>
+        <div class="faq-answer">
+          Yes. Plain is a Node.js package and works wherever Node.js is installed — Windows, macOS, and Linux. Install it with <code>npm install -g @ayoxx/plain-code</code> on any platform.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- CONTRIBUTING                                                             -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="contributing">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-hands-helping"></i> Open Source</div>
+    <h2 class="section-title">Contributing</h2>
+    <p class="section-lead">
+      Plain is open-source and welcomes contributions. Whether it&rsquo;s a bug report, a test case, a documentation fix, or a new feature — every contribution matters.
+    </p>
+
+    <div class="feature-grid" style="margin-bottom:2rem">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-bug"></i></div>
+        <h4>Report a bug</h4>
+        <p>Found something that compiles incorrectly or crashes? Open an issue on GitHub with a minimal <code>.pln</code> reproduction.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-flask"></i></div>
+        <h4>Write a test</h4>
+        <p>Tests live in <code>tests/compiler.test.js</code>. Adding a test for an edge case is one of the most valuable contributions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-code-pull-request"></i></div>
+        <h4>Submit a pull request</h4>
+        <p>Fork the repo, make your change, and run <code>node tests/compiler.test.js</code>. All 257 tests must pass before merging.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <i class="fa-brands fa-github"></i>
+      <div class="callout-body">
+        <strong>GitHub repository</strong>
+        <p>Source code, issues, and pull requests at <a href="https://github.com/ayoxx/plain" target="_blank" rel="noopener">github.com/ayoxx/plain</a>. Read <code>CONTRIBUTING.md</code> before opening a PR.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- LICENSE                                                                  -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section section--alt" id="license">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-scale-balanced"></i> License</div>
+    <h2 class="section-title">MIT License</h2>
+    <p style="color:var(--muted);max-width:640px;line-height:1.8">
+      Plain is released under the <strong>MIT License</strong>. You are free to use, modify, and distribute Plain — commercially or non-commercially — with or without modification, as long as the original copyright notice is preserved.
+    </p>
+
+    <div class="code-block" style="margin-top:1.5rem;max-width:640px">
+      <div class="code-block-header">
+        <div class="code-block-dots"><span></span><span></span><span></span></div>
+        <span class="code-block-title">LICENSE</span>
+        <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+      </div>
+      <pre><code>MIT License
+
+Copyright (c) 2024 Ayokunle
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- FOOTER                                                                   -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="footer-logo"><span>Plain</span></span>
+      <p>An Intent-Oriented Programming Language. Write programs in near-English. Compile to JavaScript.</p>
+      <div class="footer-socials">
+        <a href="https://github.com/ayoxx/plain" target="_blank" rel="noopener" aria-label="GitHub">
+          <i class="fa-brands fa-github"></i>
+        </a>
+        <a href="https://www.npmjs.com/package/@ayoxx/plain-code" target="_blank" rel="noopener" aria-label="npm">
+          <i class="fa-brands fa-npm"></i>
+        </a>
+      </div>
+    </div>
+
+    <div class="footer-col">
+      <h5>Documentation</h5>
+      <ul>
+        <li><a href="#quickstart">Quick Start</a></li>
+        <li><a href="#language">Language Tour</a></li>
+        <li><a href="#stdlib">Standard Library</a></li>
+        <li><a href="#examples">Examples</a></li>
+        <li><a href="#packages">Package System</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Features</h5>
+      <ul>
+        <li><a href="#web">Web Development</a></li>
+        <li><a href="#database">SQLite</a></li>
+        <li><a href="#cli">CLI Reference</a></li>
+        <li><a href="#formatter">Formatter</a></li>
+        <li><a href="#vscode">VS Code Extension</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Project</h5>
+      <ul>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#contributing">Contributing</a></li>
+        <li><a href="#license">License</a></li>
+        <li><a href="https://github.com/ayoxx/plain/releases" target="_blank" rel="noopener">Releases</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <p>Copyright &copy; 2024 Ayokunle. Released under the MIT License.</p>
+    <span class="badge badge-blue version-badge">
+      <i class="fa-solid fa-bolt"></i> Plain v1.0.0
+    </span>
+  </div>
 </footer>
 
+<script src="script.js"></script>
 </body>
 </html>
