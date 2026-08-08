@@ -1,5 +1,7 @@
 // Generator: converts a Plain AST into JavaScript source code.
 
+const vm = require('vm');
+
 // Known runtime packages and their require() statements.
 const KNOWN_PACKAGES = {
   express: `const express = require('express');`,
@@ -10,9 +12,37 @@ const KNOWN_PACKAGES = {
   chalk:   `const chalk = require('chalk');`,
 };
 
+// Plain module names whose npm package name differs from the Plain name.
+// Used to de-duplicate runtime requires across aliases (RFC-0011 §22).
+const NPM_NAME = {
+  sqlite: 'better-sqlite3',
+};
+
+// JavaScript reserved words that cannot be used as a const binding name.
+const JS_RESERVED = new Set([
+  'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+  'default', 'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally',
+  'for', 'function', 'if', 'implements', 'import', 'in', 'instanceof', 'interface',
+  'let', 'new', 'null', 'package', 'private', 'protected', 'public', 'return', 'static',
+  'super', 'switch', 'this', 'throw', 'true', 'try', 'typeof', 'var', 'void', 'while',
+  'with', 'yield',
+]);
+
 const BUILTIN_DECLARATIONS = {
   fs: `const fs = require('fs');`,
   crypto: `const crypto = require('crypto');`,
+  // v1.1.1 — ask runtime (RFC-0011 §14)
+  ask: [
+    `const readline = require('readline');`,
+    `async function __ask(prompt = '') {`,
+    `  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });`,
+    `  try {`,
+    `    return await new Promise((resolve) => rl.question(prompt, resolve));`,
+    `  } finally {`,
+    `    rl.close();`,
+    `  }`,
+    `}`,
+  ].join('\n'),
 };
 
 // Built-in stdlib functions: Plain name → JS code generator.
@@ -46,20 +76,40 @@ const STDLIB = {
 let _inRoute = false;
 
 function createGenerationContext() {
-  return { requires: new Set(), pendingPrelude: [] };
+  return {
+    requires: new Set(),
+    pendingPrelude: [],
+    needsAsync: false, // true when top-level code emits await (js blocks / ask)
+    inFunction: false, // true while generating inside a function-like scope
+  };
+}
+
+// Wraps a generated program so top-level `await` is legal (RFC-0011 §10).
+function wrapAsync(js) {
+  return `(async () => {\n${js}\n})();`;
+}
+
+function isValidIdentifier(name) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !JS_RESERVED.has(name);
+}
+
+function npmPackageName(moduleName) {
+  return NPM_NAME[moduleName] || moduleName;
 }
 
 function emitRequire(context, moduleName) {
-  if (context.requires.has(moduleName)) return '';
-  context.requires.add(moduleName);
+  const npmName = npmPackageName(moduleName);
+  if (context.requires.has(npmName)) return '';
+  context.requires.add(npmName);
 
   if (KNOWN_PACKAGES[moduleName]) return KNOWN_PACKAGES[moduleName];
 
-  // Keep the old friendly error for the formerly unsupported placeholder
-  // package while allowing RFC-0009.3's explicitly supported packages.
-  throw new Error(
-    `Unknown package "${moduleName}".\n\nPlain supports: ${Object.keys(KNOWN_PACKAGES).join(', ')}.\n\nExample:\n  use express`
-  );
+  // RFC-0011 §5.1 — arbitrary npm packages. A name that is not a valid JS
+  // identifier (e.g. node-fetch) is required for its side effect only.
+  if (isValidIdentifier(moduleName)) {
+    return `const ${moduleName} = require('${moduleName}');`;
+  }
+  return `require('${moduleName}');`;
 }
 
 function ensureBuiltin(context, moduleName) {
@@ -69,6 +119,22 @@ function ensureBuiltin(context, moduleName) {
   if (declaration && !context.pendingPrelude.includes(declaration)) {
     context.pendingPrelude.push(declaration);
   }
+}
+
+// True when any statement in the block emits `await` (a JavaScript block or
+// `ask`), including inside nested if / loop bodies. Nested Plain function
+// declarations are handled independently, so they are not descended into.
+function containsAsyncBlock(statements) {
+  for (const stmt of statements || []) {
+    if (stmt.type === 'AskStatement' || stmt.type === 'JavaScriptBlock') return true;
+    if (stmt.type === 'IfStatement') {
+      if (containsAsyncBlock(stmt.consequent)) return true;
+      if (stmt.alternate && containsAsyncBlock(stmt.alternate)) return true;
+    } else if (stmt.type !== 'FunctionDeclaration' && stmt.body) {
+      if (containsAsyncBlock(stmt.body)) return true;
+    }
+  }
+  return false;
 }
 
 function generate(ast, context = createGenerationContext()) {
@@ -132,10 +198,41 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       return pkg ? `${indent}${pkg}` : '';
     }
 
+    // v1.1.1 — JavaScript Gateway (RFC-0011)
+
+    // remember <name> as javascript … done
+    case 'JavaScriptBlock': {
+      if (!context.inFunction) context.needsAsync = true;
+      // Validate the raw JavaScript at compile time so JS syntax errors are
+      // reported as such, with the Plain context that produced them.
+      try {
+        new vm.Script(`(async () => {\n${node.body}\n})`);
+      } catch (e) {
+        throw new Error(
+          `JavaScript error inside the "javascript" block assigned to "${node.name}": ${e.message}`
+        );
+      }
+      // The body is emitted verbatim: JavaScript indentation, template
+      // literals, and line structure are preserved as written (RFC-0011 §31).
+      return `${indent}let ${node.name} = await (async () => {\n${node.body}\n${indent}})();`;
+    }
+
+    // ask name  /  ask "<prompt>" as name
+    case 'AskStatement': {
+      ensureBuiltin(context, 'ask');
+      if (!context.inFunction) context.needsAsync = true;
+      const prompt = node.prompt != null ? JSON.stringify(node.prompt) : '"> "';
+      return `${indent}let ${node.variable} = await __ask(${prompt});`;
+    }
+
     case 'FunctionDeclaration': {
+      const isAsync = containsAsyncBlock(node.body) ? 'async ' : '';
       const params = node.params.join(', ');
-      const body   = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
-      return `${indent}function ${node.name}(${params}) {\n${body}\n${indent}}`;
+      const prevInFunction = context.inFunction;
+      context.inFunction = true;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      context.inFunction = prevInFunction;
+      return `${indent}${isAsync}function ${node.name}(${params}) {\n${body}\n${indent}}`;
     }
 
     case 'IfStatement': {
@@ -163,15 +260,17 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     // v0.3 — Express runtime
 
     case 'ListenStatement': {
+      const handlerAsync = containsAsyncBlock(node.body) ? 'async ' : '';
       const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
-      return `${indent}app.listen(${generateExpr(node.port, context)}, () => {\n${body}\n${indent}});`;
+      return `${indent}app.listen(${generateExpr(node.port, context)}, ${handlerAsync}() => {\n${body}\n${indent}});`;
     }
 
     case 'RouteStatement': {
       _inRoute = true;
+      const handlerAsync = containsAsyncBlock(node.body) ? 'async ' : '';
       const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       _inRoute = false;
-      return `${indent}app.get(${JSON.stringify(node.path)}, (req, res) => {\n${body}\n${indent}});`;
+      return `${indent}app.get(${JSON.stringify(node.path)}, ${handlerAsync}(req, res) => {\n${body}\n${indent}});`;
     }
 
     case 'ReplyStatement':
@@ -195,9 +294,10 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
     case 'SimpleRouteStatement': {
       _inRoute = true;
+      const handlerAsync = containsAsyncBlock(node.body) ? 'async ' : '';
       const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
       _inRoute = false;
-      return `${indent}app.get(${JSON.stringify(node.path)}, (req, res) => {\n${body}\n${indent}});`;
+      return `${indent}app.get(${JSON.stringify(node.path)}, ${handlerAsync}(req, res) => {\n${body}\n${indent}});`;
     }
 
     case 'StartStatement':
@@ -315,4 +415,4 @@ function generateExpr(node, context = createGenerationContext()) {
   }
 }
 
-module.exports = { generate };
+module.exports = { generate, createGenerationContext, wrapAsync };

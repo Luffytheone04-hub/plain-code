@@ -4,6 +4,8 @@
 
 Plain is an Intent-Oriented Programming Language (IOPL). You describe **what** you want; the compiler decides **how** to implement it in JavaScript.
 
+**Current version:** v1.1.1-beta — Plain Expressions (v1.1) and the JavaScript Gateway (v1.1.1).
+
 ---
 
 ## Quick start
@@ -169,6 +171,41 @@ write(data to "users.txt")           // fs.writeFileSync(data, "users.txt", 'utf
 ```
 
 The older `readFile()` / `writeFile()` forms still work and are unchanged.
+
+JavaScript Gateway (v1.1.1)
+
+JavaScript blocks run raw JavaScript with full async support. The block body is
+passed through verbatim and wrapped in an async function whose result becomes
+the variable:
+
+```plain
+remember response as javascript
+    const res = await fetch("https://api.example.com")
+    const data = await res.json()
+    return data
+done
+show response
+```
+
+`ask` reads a line of input from the terminal, optionally with a prompt:
+
+```plain
+ask "What is your name?" as name
+show "Hello, " + name
+```
+
+Any npm package can be declared with `use` — including hyphenated names such as
+`node-fetch` and scoped packages such as `@scope/package-name`:
+
+```plain
+use axios
+use node-fetch
+use @scope/package-name
+```
+
+Names that are not valid JavaScript identifiers (like `node-fetch` or
+`@scope/package-name`) compile to a bare `require('...');`; simple names like
+`axios` still become `const axios = require('axios');`.
 
 Runtime Standard Library (v0.6)
 
@@ -424,7 +461,10 @@ use sqlite const Database = require('better-sqlite3');
 use fs const fs = require('fs');
 use path const path = require('path');
 
-Unknown packages produce a friendly compiler error.
+Any npm package can be used, including hyphenated names like `node-fetch` and
+scoped packages like `@scope/package-name`. Names that are not valid JavaScript
+identifiers compile to a bare `require('...');` and are loaded for their side
+effects, then used from JavaScript blocks or referenced by their real names.
 
 ---
 
@@ -441,10 +481,13 @@ Project structure
 ```
 Plain/
 ├── compiler/
-│   ├── lexer.js       — tokenises Plain source into tokens
-│   ├── parser.js      — builds an AST from tokens
-│   ├── generator.js   — generates JavaScript from the AST
-│   └── cli.js         — command-line entry point
+│   ├── lexer.js              — tokenises Plain source into tokens
+│   ├── parser.js             — builds an AST from tokens
+│   ├── generator.js          — generates JavaScript from the AST
+│   ├── bundler.js            — resolves imports and bundles files
+│   ├── formatter.js          — normalises Plain source style
+│   ├── dependency-detector.js— detects npm packages from source
+│   └── cli.js                — command-line entry point
 │
 ├── examples/
 │   ├── hello.pln      — variables and printing
@@ -453,10 +496,13 @@ Plain/
 │   ├── arrays.pln     — arrays and indexing
 │   ├── objects.pln    — objects and property access
 │   ├── loops.pln      — for each and while loops
-│   ├── server.pln     — Express server (v0.3)
-│   ├── database.pln   — SQLite connection (v0.3)
 │   ├── expressions.pln— Plain Expressions (v1.1)
-│   └── stdlib.pln     — runtime stdlib usage
+│   ├── stdlib.pln     — runtime stdlib usage
+│   ├── server.pln     — Express server (v0.3)
+│   ├── web-app.pln    — Express web app shorthand (v0.6)
+│   ├── start.pln      — entry file for `plain start`
+│   ├── database.pln   — SQLite connection (v0.3)
+│   └── deployment.pln — runtime dependency detection and deployment
 │
 ├── tests/
 │   └── compiler.test.js

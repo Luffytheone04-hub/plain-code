@@ -5,7 +5,7 @@ const fs   = require('fs');
 const path = require('path');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
-const { generate } = require('./generator');
+const { generate, createGenerationContext, wrapAsync } = require('./generator');
 
 // Returns the import paths declared at the top level of an AST.
 function getImports(ast) {
@@ -77,9 +77,10 @@ function resolveDependencies(entryPath) {
 // Compile all files in dependency order into one JavaScript string.
 function bundle(entryPath) {
   const files = resolveDependencies(entryPath);
-  const context = { requires: new Set(), pendingPrelude: [] };
+  const context = createGenerationContext();
   const parts = files.map(({ ast }) => generate(ast, context)).filter(js => js.trim() !== '');
-  return parts.join('\n');
+  const js = parts.join('\n');
+  return context.needsAsync ? wrapAsync(js) : js;
 }
 
 module.exports = { bundle, resolveDependencies };

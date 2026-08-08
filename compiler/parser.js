@@ -7,6 +7,7 @@ const STATEMENT_KEYWORDS = [
   'remember', 'show', 'if', 'make', 'give',
   'for', 'while', 'use', 'import', 'when', 'listen', 'reply', 'serve',
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
+  'ask', 'javascript',
 ];
 
 // Number words used by the numbered item expression (v1.1):
@@ -204,6 +205,8 @@ function parse(tokens) {
     if (token.type === TOKEN.LISTEN)      return parseListen();
     if (token.type === TOKEN.REPLY)       return parseReply();
     if (token.type === TOKEN.SERVE)       return parseServeFolder();
+    // v1.1.1 — JavaScript Gateway
+    if (token.type === TOKEN.ASK)         return parseAsk();
     // v0.6
     if (token.type === TOKEN.WEB)         return parseWebApp();
     if (token.type === TOKEN.ROUTE_KW)    return parseSimpleRoute();
@@ -253,6 +256,7 @@ function parse(tokens) {
 
   // remember <name> as <value>
   // remember <name> as\n  <key> is <val>\n...\ndone   (object literal)
+  // remember <name> as javascript\n  <raw JS>\ndone      (v1.1.1 JavaScript block)
   function parseRemember() {
     consume(TOKEN.REMEMBER);
     const name = consume(
@@ -264,6 +268,21 @@ function parse(tokens) {
       'Expected keyword "as" after the variable name.\n\nExample:\n  remember age as 16'
     );
 
+    // JavaScript block: remember <name> as javascript … done
+    if (peek().type === TOKEN.JAVASCRIPT_KW) {
+      advance(); // consume javascript
+      const bodyToken = peek();
+      if (bodyToken.type !== TOKEN.JS_BODY) {
+        throw new Error(makeError(
+          'Expected a JavaScript block after "javascript".\n\nExample:\n  remember result as javascript\n      await axios.get(url)\n  done',
+          bodyToken
+        ));
+      }
+      const body = advance().value; // consume JS_BODY
+      consume(TOKEN.DONE, 'Expected "done" to close the JavaScript block.');
+      return { type: 'JavaScriptBlock', name, body };
+    }
+
     // Object literal: next token is IDENTIFIER followed by IS
     if (peek().type === TOKEN.IDENTIFIER && peekAt(1).type === TOKEN.IS) {
       return { type: 'RememberStatement', name, value: parseObjectLiteral() };
@@ -271,6 +290,23 @@ function parse(tokens) {
 
     const value = parseExpression();
     return { type: 'RememberStatement', name, value };
+  }
+
+  // ask <variable>
+  // ask "<prompt>" as <variable>
+  function parseAsk() {
+    consume(TOKEN.ASK);
+    if (peek().type === TOKEN.STRING) {
+      const prompt = advance().value;
+      consume(TOKEN.AS,
+        'Expected "as" after the prompt.\n\nExample:\n  ask "What is your name?" as name');
+      const variable = consume(TOKEN.IDENTIFIER,
+        'Expected a variable name after "as".\n\nExample:\n  ask "What is your name?" as name').value;
+      return { type: 'AskStatement', prompt, variable };
+    }
+    const variable = consume(TOKEN.IDENTIFIER,
+      'Expected a variable name after "ask".\n\nExample:\n  ask name').value;
+    return { type: 'AskStatement', variable };
   }
 
   function parseShow() {
@@ -344,9 +380,15 @@ function parse(tokens) {
   // use <module>
   function parseUse() {
     consume(TOKEN.USE);
-    const module = consume(TOKEN.IDENTIFIER,
-      'Expected a module name after "use".\n\nExample:\n  use express').value;
-    return { type: 'UseStatement', module };
+    const token = peek();
+    if (token.type !== TOKEN.PACKAGE && token.type !== TOKEN.IDENTIFIER) {
+      throw new Error(makeError(
+        'Expected a module name after "use".\n\nExample:\n  use express',
+        token
+      ));
+    }
+    advance();
+    return { type: 'UseStatement', module: token.value };
   }
 
   // when someone visits "<path>" ... done

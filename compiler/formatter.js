@@ -23,6 +23,7 @@ const INDENT_STARTERS = [
   /^listen\s+on\s+/,           // listen on ...
   /^reply\s+json\b/,           // reply json
   /^remember\s+\S+\s+as\s*$/,  // remember x as   (object literal, ends with "as")
+  /^remember\s+\S+\s+as\s+javascript\s*$/, // remember x as javascript (raw JS block)
   /^route\s+"/,                // route "..."       (v0.6 Express DX)
   /^query\b/,                  // query SQL block   (v0.6 SQLite DX)
   /^insert\b/,                 // insert SQL block
@@ -54,10 +55,26 @@ function format(source) {
   const output     = [];
   let depth        = 0;  // keyword block depth (make/if/for each/done …)
   let bracketDepth = 0;  // bracket nesting depth for multi-line [ … ]
+  let inJsBlock    = false; // inside `remember x as javascript … done`
 
   for (let i = 0; i < rawLines.length; i++) {
-    const stripped = rawLines[i].replace(/\s+$/, ''); // remove trailing whitespace
+    const original = rawLines[i];
+    const stripped = original.replace(/\s+$/, ''); // remove trailing whitespace
     const content  = stripped.trim();
+
+    // ── Inside a raw JavaScript block ───────────────────────────────────────
+    // JavaScript must be preserved verbatim: do not re-indent or trim its
+    // lines, and do not apply Plain bracket/blank-line rules (RFC-0011 §31).
+    if (inJsBlock) {
+      if (content === 'done') {
+        if (depth > 0) depth--;
+        output.push(INDENT.repeat(depth) + 'done');
+        inJsBlock = false;
+      } else {
+        output.push(original);
+      }
+      continue;
+    }
 
     // Blank lines are preserved outside brackets; suppressed inside them.
     if (content === '') {
@@ -104,6 +121,7 @@ function format(source) {
 
     // Opening keywords: increase depth AFTER printing this line.
     if (opensBlock(content)) {
+      if (/^remember\s+\S+\s+as\s+javascript\s*$/.test(content)) inJsBlock = true;
       depth++;
     }
 

@@ -7,6 +7,7 @@ const { parse } = require('../compiler/parser');
 const { generate } = require('../compiler/generator');
 const { bundle, resolveDependencies } = require('../compiler/bundler');
 const { detectDependencies } = require('../compiler/dependency-detector');
+const { format } = require('../compiler/formatter');
 
 // Helper: bundle a fixture file and return the generated JS
 function bundleFixture(name) {
@@ -640,11 +641,16 @@ test('use path compiles to require path', () => {
   if (!js.includes("require('path')")) throw new Error('missing path require');
 });
 
-throws(
-  'unknown package gives friendly error',
-  'use math',
-  'unknown package'
-);
+test('generic npm package compiles to require (RFC-0011)', () => {
+  const js = compile('use math');
+  if (!js.includes("require('math')")) throw new Error('missing require math');
+});
+
+test('use node-fetch compiles to a bare require (not a valid identifier)', () => {
+  const js = compile('use node-fetch');
+  if (!js.includes("require('node-fetch')")) throw new Error('missing require node-fetch');
+  if (js.includes('const node-fetch')) throw new Error('node-fetch must not become a const binding');
+});
 
 // ── v0.3 — Express runtime ───────────────────────────────────────────────────
 
@@ -1129,16 +1135,14 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.1.0', () => {
+test('plain version shows 1.1.1-beta', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.0')) throw new Error(`Expected version 1.1.0 but got: ${out}`);
+  if (!out.includes('1.1.1')) throw new Error(`Expected version 1.1.1-beta but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
 
 console.log('\nv0.5 — Formatter');
-
-const { format } = require('../compiler/formatter');
 
 test('format: removes trailing whitespace', () => {
   const result = format('remember x as 1   \nshow x   ');
@@ -1399,9 +1403,9 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.1.0', () => {
+test('plain version shows 1.1.1-beta', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.0')) throw new Error(`Expected version 1.1.0 but got: ${out}`);
+  if (!out.includes('1.1.1')) throw new Error(`Expected version 1.1.1-beta but got: ${out}`);
 });
 
 // ── v0.6 — Extended comparisons ──────────────────────────────────────────────
@@ -1766,9 +1770,9 @@ test('"execute" block compiles to db.exec()', () => {
 
 console.log('\nv0.6 — CLI updates');
 
-test('plain version shows 1.1.0 (CLI)', () => {
+test('plain version shows 1.1.1-beta (CLI)', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.0')) throw new Error(`Expected 1.1.0 but got: ${out}`);
+  if (!out.includes('1.1.1')) throw new Error(`Expected 1.1.1-beta but got: ${out}`);
 });
 
 test('plain help mentions v1.0 features', () => {
@@ -1893,15 +1897,10 @@ test('misspelled "wihle" suggests "while"', () => {
   }
 });
 
-test('unknown package error mentions supported packages', () => {
-  try {
-    compile('use math');
-    throw new Error('should have thrown');
-  } catch (e) {
-    if (!e.message.includes('express')) {
-      throw new Error(`Expected supported packages in error but got: ${e.message}`);
-    }
-  }
+test('package names that are reserved words compile to a bare require', () => {
+  const js = compile('use class');
+  if (!js.includes("require('class')")) throw new Error('missing require class');
+  if (js.includes('const class')) throw new Error('reserved word must not become a const binding');
 });
 
 test('unterminated string has line and column info', () => {
@@ -2404,6 +2403,368 @@ test('format: preserves plain expressions', () => {
   if (!result.includes('first player from players')) throw new Error('item expression changed');
   if (!result.includes('add(player to players)')) throw new Error('collection expression changed');
   if (!result.includes('name of user')) throw new Error('of-expression changed');
+});
+
+// ── RFC-0011 — JavaScript Gateway (v1.1.1-beta) ─────────────────────────────
+
+console.log('\nRFC-0011 — JavaScript Gateway (v1.1.1-beta)');
+
+// ── Lexer ───────────────────────────────────────────────────────────────────
+
+test('tokenizes "javascript" as a block keyword', () => {
+  const tokens = tokenize('remember x as javascript');
+  if (tokens[3].type !== TOKEN.JAVASCRIPT_KW) throw new Error('javascript wrong');
+});
+
+test('collects raw JavaScript up to "done"', () => {
+  const tokens = tokenize('remember r as javascript\n  const v = await f()\n  return v\ndone');
+  if (tokens[3].type !== TOKEN.JAVASCRIPT_KW) throw new Error('javascript wrong');
+  if (tokens[4].type !== TOKEN.JS_BODY) throw new Error('JS_BODY wrong');
+  if (!tokens[4].value.includes('const v = await f()')) throw new Error('JS content missing');
+  if (tokens[5].type !== TOKEN.DONE) throw new Error('DONE wrong');
+});
+
+test('tokenizes "ask" keyword', () => {
+  const tokens = tokenize('ask name');
+  if (tokens[0].type !== TOKEN.ASK) throw new Error('ask wrong');
+});
+
+test('tokenizes a hyphenated package name as a PACKAGE token', () => {
+  const tokens = tokenize('use node-fetch');
+  if (tokens[0].type !== TOKEN.USE) throw new Error('use wrong');
+  if (tokens[1].type !== TOKEN.PACKAGE) throw new Error('expected PACKAGE token');
+  if (tokens[1].value !== 'node-fetch') throw new Error('wrong package value');
+});
+
+test('tokenizes a scoped package name as a PACKAGE token', () => {
+  const tokens = tokenize('use @scope/package-name');
+  if (tokens[1].type !== TOKEN.PACKAGE) throw new Error('expected PACKAGE token');
+  if (tokens[1].value !== '@scope/package-name') throw new Error('wrong package value');
+});
+
+// ── Parser ──────────────────────────────────────────────────────────────────
+
+test('parses a JavaScript block to a JavaScriptBlock node', () => {
+  const ast = parse(tokenize('remember result as javascript\n  await axios.get(url)\ndone'));
+  const node = ast.body[0];
+  if (node.type !== 'JavaScriptBlock') throw new Error('wrong node type');
+  if (node.name !== 'result') throw new Error('wrong name');
+  if (!node.body.includes('await axios.get(url)')) throw new Error('wrong body');
+});
+
+test('parses ask variable to an AskStatement', () => {
+  const node = parse(tokenize('ask name')).body[0];
+  if (node.type !== 'AskStatement') throw new Error('wrong node type');
+  if (node.variable !== 'name') throw new Error('wrong variable');
+  if (node.prompt !== undefined) throw new Error('bare ask should have no prompt');
+});
+
+test('parses ask with prompt to an AskStatement', () => {
+  const node = parse(tokenize('ask "What is your name?" as name')).body[0];
+  if (node.type !== 'AskStatement') throw new Error('wrong node type');
+  if (node.variable !== 'name') throw new Error('wrong variable');
+  if (node.prompt !== 'What is your name?') throw new Error('wrong prompt');
+});
+
+test('ask with a prompt requires "as"', () => {
+  try {
+    compile('ask "hi" name');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.toLowerCase().includes('as')) throw e;
+  }
+});
+
+// ── Dependency detection (RFC-0011 §21) ────────────────────────────────────
+
+test('detects arbitrary npm packages', () => {
+  assert(JSON.stringify(detectDependencies('use axios')), '["axios"]');
+  assert(JSON.stringify(detectDependencies('use dotenv')), '["dotenv"]');
+  assert(JSON.stringify(detectDependencies('use bcrypt')), '["bcrypt"]');
+  assert(JSON.stringify(detectDependencies('use sharp')), '["sharp"]');
+});
+
+test('detects multiple generic npm packages in order', () => {
+  assert(JSON.stringify(detectDependencies('use axios\nuse dotenv\nuse bcrypt')),
+    '["axios","dotenv","bcrypt"]');
+});
+
+test('deduplicates generic npm packages', () => {
+  assert(JSON.stringify(detectDependencies('use axios\nuse axios\nuse dotenv')),
+    '["axios","dotenv"]');
+});
+
+test('unknown valid package names are not rejected', () => {
+  assert(JSON.stringify(detectDependencies('use semver')), '["semver"]');
+});
+
+test('node-fetch is detected as a dependency', () => {
+  assert(JSON.stringify(detectDependencies('use node-fetch')), '["node-fetch"]');
+});
+
+test('generic packages imported from other files are deduplicated at bundle time', () => {
+  const js = bundleFixture('gateway_imports_axios.pln');
+  const count = (js.match(/require\('axios'\)/g) || []).length;
+  if (count !== 1) throw new Error(`expected one axios require but got ${count}`);
+  if (!js.includes('"gateway loaded"')) throw new Error('entry output missing');
+});
+
+// ── JavaScript blocks ───────────────────────────────────────────────────────
+
+test('basic JavaScript block compiles to an async IIFE assignment', () => {
+  assert(compile('remember result as javascript\n  const value = await something()\n  return value\ndone'),
+    'let result = await (async () => {\n  const value = await something()\n  return value\n})();');
+});
+
+test('JavaScript block preserves statements and expressions verbatim', () => {
+  const js = compile('remember data as javascript\n  const obj = { a: [1, 2, 3] }\n  items.forEach((x) => console.log(x))\n  try { run() } catch (e) { console.error(e) }\n  return obj\ndone');
+  if (!js.includes('const obj = { a: [1, 2, 3] }')) throw new Error('object literal lost');
+  if (!js.includes('items.forEach((x) => console.log(x))')) throw new Error('callback lost');
+  if (!js.includes('try { run() } catch (e) { console.error(e) }')) throw new Error('try/catch lost');
+});
+
+test('JavaScript block supports async/await', () => {
+  const js = compile('remember response as javascript\n  const data = await axios.get(url)\n  return data.data\ndone');
+  if (!js.includes('await (async () => {')) throw new Error('missing async IIFE');
+  if (!js.includes('await axios.get(url)')) throw new Error('missing await');
+  if (!js.includes('return data.data')) throw new Error('missing return');
+});
+
+test('JavaScript block can read Plain variables in scope', () => {
+  const js = compile('remember url as "https://api.example.com"\nremember response as javascript\n  return await axios.get(url)\ndone');
+  if (!js.includes('axios.get(url)')) throw new Error('plain variable not visible inside JS block');
+});
+
+test('Plain code can use the result of a JavaScript block', () => {
+  const js = compile('remember response as javascript\n  return 42\ndone\nshow response');
+  if (!js.includes('let response = await (async () => {')) throw new Error('missing assignment');
+  if (!js.includes('console.log(response)')) throw new Error('result not usable in Plain');
+});
+
+test('JavaScript block body is emitted verbatim (template literals preserved)', () => {
+  const js = compile('remember t as javascript\n  return `hello\n  world`\ndone');
+  if (!js.includes('return `hello')) throw new Error('template literal changed');
+});
+
+test('JavaScript block with invalid JS reports a JavaScript error', () => {
+  try {
+    compile('remember x as javascript\n  const = 5\ndone');
+    throw new Error('should have thrown');
+  } catch (e) {
+    if (!e.message.includes('JavaScript error')) throw e;
+    if (!e.message.includes('x')) throw new Error('should mention the variable name');
+  }
+});
+
+test('JavaScript block inside a function makes the function async', () => {
+  const js = compile('make fetch()\n  remember result as javascript\n    const v = await job()\n    return v\n  done\n  give result\ndone');
+  if (!js.includes('async function fetch()')) throw new Error('function not async');
+  if (!js.includes('await (async () => {')) throw new Error('missing async IIFE');
+});
+
+test('JavaScript block inside a route makes the handler async', () => {
+  const js = compile('route "/data"\n  remember x as javascript\n    return 1\n  done\n  reply x\ndone');
+  if (!js.includes('async (req, res) =>')) throw new Error('route handler not async');
+});
+
+test('functions without async blocks stay synchronous', () => {
+  const js = compile('make greet()\n  show "hi"\ndone');
+  if (js.includes('async function')) throw new Error('plain function unexpectedly async');
+});
+
+test('JavaScript block inside a while loop compiles inside the loop', () => {
+  const js = compile('while x is above 0\n  remember v as javascript\n    return run(x)\n  done\n  x becomes x + 1\ndone');
+  if (!js.includes('while (x > 0)')) throw new Error('missing while');
+  if (!js.includes('await (async () => {')) throw new Error('missing JS block in loop');
+});
+
+// ── ask ─────────────────────────────────────────────────────────────────────
+
+test('ask variable compiles to a readline prompt', () => {
+  const js = compile('ask name');
+  if (!js.includes('let name = await __ask("> ");')) throw new Error('missing ask statement');
+});
+
+test('ask with a prompt compiles to a prompted readline call', () => {
+  const js = compile('ask "What is your name?" as name');
+  if (!js.includes('let name = await __ask("What is your name?");')) throw new Error('missing prompted ask');
+});
+
+test('ask emits the readline runtime prelude once', () => {
+  const js = compile('ask name\nask "age" as age');
+  const count = (js.match(/const readline = require\('readline'\);/g) || []).length;
+  if (count !== 1) throw new Error(`expected one readline prelude but got ${count}`);
+  if (!js.includes('async function __ask')) throw new Error('missing __ask runtime');
+});
+
+test('ask inside a function makes the function async', () => {
+  const js = compile('make greet()\n  ask name\n  show "Hello, " + name\ndone');
+  if (!js.includes('async function greet()')) throw new Error('function not async');
+  if (!js.includes('await __ask("> ")')) throw new Error('missing ask call');
+});
+
+test('ask inside a loop compiles inside the loop', () => {
+  const js = compile('while x is above 0\n  ask "Next?" as name\n  x becomes x + 1\ndone');
+  if (!js.includes('while (x > 0)')) throw new Error('missing while');
+  if (!js.includes('await __ask("Next?")')) throw new Error('missing ask in loop');
+});
+
+test('ask result used in expressions', () => {
+  const js = compile('ask "Age?" as age\nshow age + 1');
+  if (!js.includes('console.log(age + 1)')) throw new Error('ask result not usable in expression');
+});
+
+// ── Async runtime wrapper ───────────────────────────────────────────────────
+
+test('bundle wraps programs containing JavaScript blocks in an async runtime', () => {
+  const js = bundleFixture('gateway_js.pln');
+  if (!js.includes('(async () => {')) throw new Error('missing async wrapper');
+  if (!js.includes('let response = await (async () => {')) throw new Error('missing JS block');
+  if (!js.includes('console.log(response)')) throw new Error('missing show');
+});
+
+test('bundle wraps programs containing ask in an async runtime', () => {
+  const js = bundleFixture('gateway_ask.pln');
+  if (!js.includes('(async () => {')) throw new Error('missing async wrapper');
+  if (!js.includes('await __ask("Name?")')) throw new Error('missing ask');
+});
+
+test('bundle does not wrap programs without async features', () => {
+  const js = bundleFixture('uses_math.pln');
+  if (js.includes('(async () => {')) throw new Error('unexpected async wrapper');
+});
+
+// ── Formatter ───────────────────────────────────────────────────────────────
+
+test('format: preserves JavaScript block lines verbatim', () => {
+  const src = 'remember result as javascript\n        const x = 1\n    return x\ndone';
+  const result = format(src);
+  if (!result.includes('        const x = 1')) throw new Error('JS line whitespace changed');
+  if (!result.includes('    return x')) throw new Error('JS return line whitespace changed');
+  if (!result.match(/^done/m)) throw new Error('"done" not dedented');
+});
+
+test('format: JavaScript block inside a function keeps outer indentation', () => {
+  const src = 'make run()\nremember x as javascript\n        const v = 1\ndone\ndone';
+  const result = format(src);
+  if (!result.includes('    remember x as javascript')) throw new Error('block line not indented');
+  if (!result.includes('        const v = 1')) throw new Error('JS body not preserved');
+  if (!result.includes('    done')) throw new Error('inner done not at depth 1');
+});
+
+test('format: idempotent with JavaScript blocks', () => {
+  const src = 'remember x as javascript\n    const v = 1\n    return v\ndone\nshow x';
+  const once  = format(src);
+  const twice = format(once);
+  if (once !== twice) throw new Error('format not idempotent with JS blocks');
+});
+
+// ── Generic npm packages ────────────────────────────────────────────────────
+
+test('use axios compiles to a require binding', () => {
+  assert(compile('use axios'), 'const axios = require(\'axios\');');
+});
+
+test('use dotenv and use sharp compile to require bindings', () => {
+  const js = compile('use dotenv\nuse sharp');
+  if (!js.includes("require('dotenv')")) throw new Error('missing dotenv');
+  if (!js.includes("require('sharp')")) throw new Error('missing sharp');
+});
+
+test('duplicate generic requires are emitted once', () => {
+  const js = compile('use axios\nuse axios');
+  const count = (js.match(/require\('axios'\)/g) || []).length;
+  if (count !== 1) throw new Error(`expected one axios require but got ${count}`);
+});
+
+test('use sqlite still maps to better-sqlite3', () => {
+  const js = compile('use sqlite');
+  if (!js.includes("require('better-sqlite3')")) throw new Error('missing better-sqlite3');
+});
+
+test('use node-fetch compiles to a bare require', () => {
+  assert(compile('use node-fetch'), "require('node-fetch');");
+});
+
+test('use @scope/package compiles to a bare require', () => {
+  assert(compile('use @scope/package'), "require('@scope/package');");
+});
+
+test('use @scope/package-name compiles to a bare require', () => {
+  assert(compile('use @scope/package-name'), "require('@scope/package-name');");
+});
+
+test('hyphenated and scoped packages compile alongside regular packages', () => {
+  const js = compile('use axios\nuse node-fetch\nuse @scope/package');
+  if (!js.includes("const axios = require('axios');")) throw new Error('missing axios binding');
+  if (!js.includes("require('node-fetch');")) throw new Error('missing node-fetch');
+  if (!js.includes("require('@scope/package');")) throw new Error('missing scoped package');
+});
+
+test('bundle: generic npm packages are detected and required', () => {
+  const js = bundleFixture('uses_npm.pln');
+  if (!js.includes("require('node-fetch');")) throw new Error('missing node-fetch');
+  if (!js.includes("require('@scope/package-name');")) throw new Error('missing scoped package');
+  if (!js.includes("require('dotenv');")) throw new Error('missing dotenv');
+});
+
+test('bundle: hyphenated packages imported from other files are deduplicated', () => {
+  const js = bundleFixture('gateway_imports_npm.pln');
+  const count = (js.match(/require\('node-fetch'\)/g) || []).length;
+  if (count !== 1) throw new Error(`expected one node-fetch require but got ${count}`);
+  if (!js.includes('"gateway loaded"')) throw new Error('entry output missing');
+});
+
+test('use node-fetch inside a loop body works', () => {
+  const js = compile('while x is above 0\n  use node-fetch\n  x becomes x + 1\ndone');
+  if (!js.includes("require('node-fetch');")) throw new Error('missing node-fetch in loop');
+});
+
+test('use @scope/package inside a function body works', () => {
+  const js = compile('make load()\n  use @scope/package\n  show "loaded"\ndone');
+  if (!js.includes("require('@scope/package');")) throw new Error('missing scoped package in function');
+});
+
+test('use node-fetch inside an if body works', () => {
+  const js = compile('if x is 1\n  use node-fetch\ndone');
+  if (!js.includes("require('node-fetch');")) throw new Error('missing node-fetch in if');
+});
+
+test('hyphenated package require inside a JavaScript block is preserved verbatim', () => {
+  const js = compile('remember f as javascript\n  const mod = require("node-fetch")\n  return mod\ndone');
+  if (!js.includes('require("node-fetch")')) throw new Error('JS block content changed');
+});
+
+// ── CLI ─────────────────────────────────────────────────────────────────────
+
+test('plain help includes the JavaScript Gateway', () => {
+  const out = runCli(['help'], process.cwd());
+  if (!out.includes('JavaScript')) throw new Error('"JavaScript" missing from help');
+  if (!out.includes('ask')) throw new Error('"ask" missing from help');
+});
+
+test('plain version shows the beta version', () => {
+  const out = runCli(['version'], process.cwd());
+  if (!out.includes('1.1.1')) throw new Error(`Expected 1.1.1-beta but got: ${out}`);
+});
+
+test('plain build produces executable async output for a JavaScript block', () => {
+  const dir = tmpDir();
+  const plnFile = path.join(dir, 'gw.pln');
+  fs.writeFileSync(plnFile, 'remember x as javascript\n  return 1\ndone\nshow x\n');
+  runCli(['build', plnFile], dir);
+  const js = fs.readFileSync(path.join(dir, 'gw.js'), 'utf8');
+  if (!js.includes('(async () => {')) throw new Error('build output not wrapped');
+  if (!js.includes('let x = await (async () => {')) throw new Error('JS block missing in build');
+});
+
+test('plain run on a nonexistent file reports a friendly error', () => {
+  const dir = tmpDir();
+  const out = runCli(['run', 'missing.pln'], dir);
+  const msg = out.toLowerCase();
+  if (!msg.includes('cannot find') && !msg.includes('not found') && !msg.includes('resolving')) {
+    throw new Error(`Expected a file-not-found error but got: ${out}`);
+  }
 });
 
 // ── Summary ──────────────────────────────────────────────────────────────────

@@ -58,6 +58,11 @@ const TOKEN = {
   DELETE_KW:   'DELETE_KW',
   EXECUTE_KW:  'EXECUTE_KW',
   SQL_BODY:    'SQL_BODY',   // raw SQL collected between a block keyword and "done"
+  // v1.1.1 — JavaScript Gateway (RFC-0011)
+  JAVASCRIPT_KW: 'JAVASCRIPT_KW', // the "javascript" keyword introducing a raw JS block
+  JS_BODY:       'JS_BODY',       // raw JavaScript collected between "javascript" and "done"
+  ASK:           'ASK',           // interactive input: ask name / ask "prompt" as name
+  PACKAGE:       'PACKAGE',       // bare npm package name after "use" (may contain -, _, ., /, @)
   // Punctuation
   LPAREN:      'LPAREN',
   RPAREN:      'RPAREN',
@@ -126,6 +131,9 @@ const KEYWORDS = {
   start:     TOKEN.START_KW,
   // v0.6 — SQLite DX
   database:  TOKEN.DATABASE_KW,
+  // v1.1.1 — JavaScript Gateway (RFC-0011)
+  javascript: TOKEN.JAVASCRIPT_KW,
+  ask:        TOKEN.ASK,
 };
 
 // Keywords that introduce raw SQL blocks (content up to "done" is collected verbatim).
@@ -142,6 +150,7 @@ function tokenize(source) {
   let i = 0;
   let line = 1;
   let lineStart = 0;
+  let pendingUse = false; // true between a "use" keyword and its package name
 
   function col() { return i - lineStart + 1; }
 
@@ -161,6 +170,19 @@ function tokenize(source) {
 
     const tokenLine = line;
     const tokenCol  = col();
+
+    // Package name after "use": a bare npm specifier may contain hyphens,
+    // underscores, dots, slashes, and a scope ("@scope/package-name").
+    if (pendingUse) {
+      if (/[A-Za-z0-9@]/.test(source[i])) {
+        let pkg = '';
+        while (i < source.length && /[A-Za-z0-9_.@/-]/.test(source[i])) pkg += source[i++];
+        tokens.push({ type: TOKEN.PACKAGE, value: pkg, line: tokenLine, col: tokenCol });
+        pendingUse = false;
+        continue;
+      }
+      pendingUse = false; // not a package start — tokenize normally
+    }
 
     // String literal
     if (source[i] === '"') {
@@ -233,7 +255,49 @@ function tokenize(source) {
         continue;
       }
 
+      // "javascript" introduces a raw JavaScript block: collect every line
+      // verbatim until a line whose trimmed content is exactly "done".
+      // This mirrors the SQL block behaviour so the lexer never has to
+      // understand the JavaScript grammar inside the block.
+      if (word === 'javascript') {
+        tokens.push({ type: TOKEN.JAVASCRIPT_KW, value: word, line: tokenLine, col: tokenCol });
+
+        let j = i;
+        while (j < source.length && (source[j] === ' ' || source[j] === '\t')) j++;
+
+        if (j >= source.length || source[j] === '\n' || source[j] === '\r') {
+          // Raw block mode — advance past the newline and collect until "done"
+          i = j;
+          if (i < source.length && source[i] === '\n') { i++; line++; lineStart = i; }
+
+          let js = '';
+          while (i < source.length) {
+            const lineEnd  = source.indexOf('\n', i);
+            const realEnd  = lineEnd === -1 ? source.length : lineEnd;
+            const lineText = source.slice(i, realEnd);
+            const trimmed  = lineText.trim();
+
+            if (trimmed === 'done') {
+              i = realEnd < source.length ? realEnd + 1 : realEnd;
+              if (realEnd < source.length) { line++; lineStart = i; }
+              break;
+            }
+
+            js += lineText + '\n';
+            i = realEnd < source.length ? realEnd + 1 : realEnd;
+            if (realEnd < source.length) { line++; lineStart = i; }
+          }
+
+          tokens.push({ type: TOKEN.JS_BODY,  value: js.trimEnd(), line: tokenLine, col: tokenCol });
+          tokens.push({ type: TOKEN.DONE,      value: 'done',       line, col: col() });
+        }
+        // else: "javascript" on its own line is followed by a value —
+        // parsed normally by the parser (used as a remembered value).
+        continue;
+      }
+
       const type = KEYWORDS[word] || TOKEN.IDENTIFIER;
+      if (type === TOKEN.USE) pendingUse = true;
       tokens.push({ type, value: word, line: tokenLine, col: tokenCol });
       continue;
     }

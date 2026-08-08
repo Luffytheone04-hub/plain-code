@@ -20,12 +20,12 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { tokenize } = require('./lexer');
 const { parse }    = require('./parser');
-const { generate } = require('./generator');
+const { generate, createGenerationContext, wrapAsync } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule } = require('./dependency-detector');
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1-beta';
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -82,6 +82,15 @@ v1.1 Plain Expressions
   Properties:   name of user / city of address of customer /
                 name of user becomes "Ayo"
   Files:        read("users.txt") / write(data to "users.txt")
+
+v1.1.1 JavaScript Gateway (beta)
+
+  JavaScript:   remember result as javascript
+                    await axios.get(url)
+                done
+  Input:        ask name / ask "What is your name?" as name
+  Packages:     use axios / use dotenv / use node-fetch — any npm package
+  Async:        JavaScript blocks and ask run in an async runtime
 
 Examples:
   plain run hello.pln
@@ -217,16 +226,19 @@ function compile(filePath) {
   });
   stage('Building dependency graph', () => files);
   stage('Checking runtime dependencies', () => ensureDependencies(files, readPlainJson(), true));
-  const generationContext = { requires: new Set(), pendingPrelude: [] };
-  const js = stage('Generating JavaScript', () =>
+  const generationContext = createGenerationContext();
+  let js = stage('Generating JavaScript', () =>
     files.map(({ ast }) => generate(ast, generationContext)).filter(s => s.trim()).join('\n')
   );
+  // Wrap the whole program when it contains top-level await (JavaScript
+  // blocks or `ask`), so the generated code can legally await (RFC-0011 §10).
+  if (generationContext.needsAsync) js = wrapAsync(js);
   return js;
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-function cmdRun(filePath) {
+function cmdRun(filePath, extraArgs = []) {
   if (!filePath) {
     console.error('Usage: plain run <file.pln>');
     process.exit(1);
@@ -236,10 +248,13 @@ function cmdRun(filePath) {
   const tmpFile = path.join(__dirname, '_plain_out.js');
   fs.writeFileSync(tmpFile, js, 'utf8');
   try {
-    execFileSync(process.execPath, [tmpFile], { stdio: 'inherit' });
-  } finally {
+    execFileSync(process.execPath, [tmpFile, ...extraArgs], { stdio: 'inherit' });
+  } catch (e) {
     fs.unlinkSync(tmpFile);
+    console.error('\nThe program exited with an error. See the message above.');
+    process.exit(1);
   }
+  fs.unlinkSync(tmpFile);
   console.log('\nDone.');
 }
 
@@ -254,7 +269,7 @@ function cmdBuild(filePath) {
   console.log(`\nOutput written to ${outPath}`);
 }
 
-function cmdStart() {
+function cmdStart(extraArgs = []) {
   const config = readPlainJson();
   if (!config) {
     console.error(`No ${PLAIN_JSON} found. Run "plain init" first.`);
@@ -265,7 +280,7 @@ function cmdStart() {
     console.error(`Entry file "${entry}" not found.`);
     process.exit(1);
   }
-  cmdRun(entry);
+  cmdRun(entry, extraArgs);
 }
 
 function cmdNew(projectName) {
@@ -601,14 +616,14 @@ function cmdHelp() {
 const [, , command, fileArg] = process.argv;
 
 switch (command) {
-  case 'run':     cmdRun(fileArg);        break;
+  case 'run':     cmdRun(fileArg, process.argv.slice(4)); break;
   case 'build':   cmdBuild(fileArg);      break;
   case 'check':   cmdCheck(fileArg);      break;
   case 'fmt':     cmdFmt(fileArg);        break;
   case 'new':     cmdNew(fileArg);        break;
   case 'init':    cmdInit();              break;
   case 'install': cmdInstall();           break;
-  case 'start':   cmdStart();             break;
+  case 'start':   cmdStart(process.argv.slice(3)); break;
   case 'doctor':  cmdDoctor();            break;
   case 'add':     cmdAdd(fileArg);        break;
   case 'remove':  cmdRemove(fileArg);     break;
