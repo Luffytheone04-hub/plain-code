@@ -245,7 +245,11 @@ function cmdRun(filePath, extraArgs = []) {
   }
   const js = compile(filePath);
   console.log('');
-  const tmpFile = path.join(__dirname, '_plain_out.js');
+  // Execute the generated file from the entry file's directory so Node
+  // resolves require(...) against the project's local node_modules instead
+  // of Plain's own (globally installed) package directory.
+  const outputDir = path.dirname(path.resolve(filePath));
+  const tmpFile = path.join(outputDir, '_plain_out.js');
   fs.writeFileSync(tmpFile, js, 'utf8');
   try {
     execFileSync(process.execPath, [tmpFile, ...extraArgs], { stdio: 'inherit' });

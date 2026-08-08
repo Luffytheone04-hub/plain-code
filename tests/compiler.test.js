@@ -2767,6 +2767,100 @@ test('plain run on a nonexistent file reports a friendly error', () => {
   }
 });
 
+// ── Regression: project-local dependency resolution ────────────────────────
+
+// Fabricate an "installed" package inside a project's node_modules without
+// hitting the network, so isInstalled() (require.resolve) treats it as present.
+function writeLocalPackage(projectDir, pkgName, mainSrc) {
+  const pkgDir = path.join(projectDir, 'node_modules', pkgName);
+  fs.mkdirSync(pkgDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(pkgDir, 'package.json'),
+    JSON.stringify({ name: pkgName, version: '1.0.0', main: 'index.js' })
+  );
+  fs.writeFileSync(path.join(pkgDir, 'index.js'), mainSrc);
+}
+
+test('plain run resolves dependencies from the project node_modules, not the global install', () => {
+  const dir = tmpDir();
+  writeLocalPackage(dir, 'plainlocaltest', 'module.exports = "resolved-from-project-node_modules";\n');
+  fs.writeFileSync(path.join(dir, 'app.pln'), 'use plainlocaltest\nshow plainlocaltest\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('resolved-from-project-node_modules')) {
+    throw new Error(`local dependency did not resolve from the project. Output:\n${out}`);
+  }
+  const stale = path.join(__dirname, '..', 'compiler', '_plain_out.js');
+  if (fs.existsSync(stale)) {
+    throw new Error('_plain_out.js was written into the compiler directory');
+  }
+});
+
+test('plain start resolves project-local dependencies via the plain.json entry', () => {
+  const dir = tmpDir();
+  writeLocalPackage(dir, 'plainlocaltest', 'module.exports = "start-resolved-locally";\n');
+  fs.writeFileSync(path.join(dir, 'app.pln'), 'use plainlocaltest\nshow plainlocaltest\n');
+  fs.writeFileSync(path.join(dir, 'plain.json'), JSON.stringify({ entry: 'app.pln' }));
+  const out = runCli(['start'], dir);
+  if (!out.includes('start-resolved-locally')) {
+    throw new Error(`plain start did not resolve the local dependency. Output:\n${out}`);
+  }
+});
+
+test('hyphenated packages resolve at runtime from the project node_modules', () => {
+  const dir = tmpDir();
+  const marker = path.join(dir, 'hyphenated-loaded.txt');
+  writeLocalPackage(dir, 'plain-fake-fetch',
+    `require('fs').writeFileSync(${JSON.stringify(marker)}, 'ok');\nmodule.exports = {};\n`);
+  fs.writeFileSync(path.join(dir, 'app.pln'), 'use plain-fake-fetch\nshow "hyphenated-ok"\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('hyphenated-ok')) throw new Error(`run failed. Output:\n${out}`);
+  if (!fs.existsSync(marker)) {
+    throw new Error('hyphenated package was not loaded from the project node_modules');
+  }
+});
+
+test('scoped packages resolve at runtime from the project node_modules', () => {
+  const dir = tmpDir();
+  const marker = path.join(dir, 'scoped-loaded.txt');
+  writeLocalPackage(dir, '@fakescope/pkg',
+    `require('fs').writeFileSync(${JSON.stringify(marker)}, 'ok');\nmodule.exports = {};\n`);
+  fs.writeFileSync(path.join(dir, 'app.pln'), 'use @fakescope/pkg\nshow "scoped-ok"\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('scoped-ok')) throw new Error(`run failed. Output:\n${out}`);
+  if (!fs.existsSync(marker)) {
+    throw new Error('scoped package was not loaded from the project node_modules');
+  }
+});
+
+test('multiple project-local dependencies resolve at runtime', () => {
+  const dir = tmpDir();
+  writeLocalPackage(dir, 'plainfirst', 'module.exports = "first";\n');
+  writeLocalPackage(dir, 'plainsecond', 'module.exports = "second";\n');
+  fs.writeFileSync(path.join(dir, 'app.pln'),
+    'use plainfirst\nuse plainsecond\nshow plainfirst + " " + plainsecond\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('first second')) throw new Error(`multiple deps did not resolve. Output:\n${out}`);
+});
+
+test('multi-file projects resolve project-local dependencies at runtime', () => {
+  const dir = tmpDir();
+  writeLocalPackage(dir, 'plainlocaltest', 'module.exports = "from-multifile";\n');
+  fs.writeFileSync(path.join(dir, 'lib.pln'), 'make version()\n  give "v2"\ndone\n');
+  fs.writeFileSync(path.join(dir, 'app.pln'),
+    'import "./lib.pln"\nuse plainlocaltest\nshow plainlocaltest + " " + version()\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('from-multifile v2')) throw new Error(`multi-file run failed. Output:\n${out}`);
+});
+
+test('built-in modules still execute after the dependency-resolution fix', () => {
+  const dir = tmpDir();
+  fs.writeFileSync(path.join(dir, 'note.txt'), 'hello-builtin');
+  fs.writeFileSync(path.join(dir, 'app.pln'),
+    'use fs\nremember content as readFile("note.txt")\nshow content\n');
+  const out = runCli(['run', 'app.pln'], dir);
+  if (!out.includes('hello-builtin')) throw new Error(`built-in fs failed. Output:\n${out}`);
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
