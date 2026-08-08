@@ -6,7 +6,7 @@ Syntax highlighting for the Plain programming language in MT Manager.
 
 1. Download `Plain.mtsx`.
 2. Open MT Manager.
-3. Import the syntax package.
+3. Import and Install the syntax package.
 4. Open any `.pln` file.
 
 ## Features

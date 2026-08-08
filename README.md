@@ -1,6 +1,7 @@
 # Plain
 
 > "When even a simple sentence can be code."
+> Don't forget to star the repo 
 
 Plain is an Intent-Oriented Programming Language (IOPL). You describe **what** you want; the compiler decides **how** to implement it in JavaScript.
 
