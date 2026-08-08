@@ -21,4 +21,4 @@ Syntax highlighting for the Plain programming language in MT Manager.
 - Web and SQLite keywords
 - Runtime standard library
 
-Compatible with Plain v1.0.0.
+Compatible with Plain v1.1.1

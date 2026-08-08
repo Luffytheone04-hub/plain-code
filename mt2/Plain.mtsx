@@ -1,34 +1,256 @@
+// require MT >= 2.16.0
+
 {
-    // 语法名称和关联的文件扩展名
     name: ["Plain", ".pln"]
 
-    // 行注释配置（Plain 语言使用 # 和 //）
-    comment: {startsWith: "#"}
+    hide: false
+
+    ignoreCase: false
+
+    styles: [
+        "keyword", #CC7832, #CC7832, @B
+        "keyword2", #AE8ABE, #AE8ABE, @B
+        "builtin", #56B6C2, #56B6C2
+        "function", #61AFEF, #61AFEF
+        "variable", #E5C07B, #E5C07B
+        "property", #98C379, #98C379
+        "string", #6A8759, #6A8759
+        "number", #6897BB, #6897BB
+        "package", #C678DD, #C678DD
+        "operator", #508090, #508090
+        "comment", #808080, #808080, @I
+        "javascript", #ABB2BF, #ABB2BF
+    ]
+
     comment: {startsWith: "//"}
 
-    // 主要匹配规则
+    bracketPairs: [
+        "{}"
+        "[]"
+        "()"
+    ]
+
     contains: [
-        // 多词关键字（必须放在单词关键字之前，避免被截断）
-        {match: /\b(is\s+not)\b/, 0: "keyword"},
-        {match: /\b(starts\s+with)\b/, 0: "keyword"},
-        {match: /\b(ends\s+with)\b/, 0: "keyword"},
-        {match: /\b(at\s+least)\b/, 0: "keyword"},
-        {match: /\b(at\s+most)\b/, 0: "keyword"},
 
-        // 布尔值和空常量
-        {match: keywordsToRegex("true false nothing"), 0: "constant"},
+        // ------------------------------------------------------------
+        // Comments
+        // ------------------------------------------------------------
 
-        // 单词关键字
-        {match: keywordsToRegex(
-            "remember as becomes make give if otherwise while for each every in done"
-            "show use web app route reply start database query execute insert update delete"
-            "is contains between above below empty"
-        ), 0: "keyword"},
+        {
+            match: /\/\/.*/
+            0: "comment"
+        }
 
-        // 数字（十进制、十六进制、浮点、科学计数、支持 _ 分隔）
-        {number: "10|16|F|E|_"},
+        // ------------------------------------------------------------
+        // Strings
+        // ------------------------------------------------------------
 
-        // 字符串（单引号和双引号，自动处理转义）
-        {builtin: #QUOTED_STRING#}
+        {
+            match: /".*?"/
+            0: "string"
+        }
+
+        {
+            match: /'.*?'/
+            0: "string"
+        }
+
+        // ------------------------------------------------------------
+        // JavaScript Gateway
+        // ------------------------------------------------------------
+
+        {
+            start: {match: /(?m)^[ \t]*javascript\b/}
+            end: {match: /(?m)^[ \t]*done[ \t]*$/}
+            style: "javascript"
+
+            contains: [
+                {
+                    match: /\/\/.*/
+                    0: "comment"
+                }
+
+                {
+                    match: /".*?"/
+                    0: "string"
+                }
+
+                {
+                    match: /'.*?'/
+                    0: "string"
+                }
+
+                {
+                    match: /`.*?`/
+                    0: "string"
+                }
+
+                {
+                    match: /\b(const|let|var|function|return|async|await|new|if|else|for|while|try|catch|throw)\b/
+                    0: "keyword"
+                }
+
+                {
+                    match: /\b(true|false|null|undefined)\b/
+                    0: "keyword2"
+                }
+
+                {
+                    match: /\b[0-9]+(\.[0-9]+)?\b/
+                    0: "number"
+                }
+            ]
+        }
+
+        // ------------------------------------------------------------
+        // Package names
+        // ------------------------------------------------------------
+
+        {
+            match: /\buse[ \t]+@[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+/
+            0: "package"
+        }
+
+        {
+            match: /\buse[ \t]+[A-Za-z0-9][A-Za-z0-9._-]*/
+            0: "package"
+        }
+
+        // ------------------------------------------------------------
+        // Plain declarations
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(remember|make|give|becomes|use|import)\b/
+            0: "keyword"
+        }
+
+        // ------------------------------------------------------------
+        // Control flow
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(if|otherwise|done|while)\b/
+            0: "keyword"
+        }
+
+        {
+            match: /\b(for|each|every|in)\b/
+            0: "keyword"
+        }
+
+        // ------------------------------------------------------------
+        // Comparisons
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(is|above|below|at|least|most|not|empty)\b/
+            0: "operator"
+        }
+
+        {
+            match: /\b(contains|starts|with|ends|between|and)\b/
+            0: "operator"
+        }
+
+        // ------------------------------------------------------------
+        // Plain Expressions
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(first|last|item|length|of|from|to|add|remove)\b/
+            0: "keyword2"
+        }
+
+        // ------------------------------------------------------------
+        // Number words
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(one|two|three|four|five|six|seven|eight|nine|ten)\b/
+            0: "number"
+        }
+
+        {
+            match: /\b(eleven|twelve|thirteen|fourteen|fifteen)\b/
+            0: "number"
+        }
+
+        {
+            match: /\b(sixteen|seventeen|eighteen|nineteen|twenty)\b/
+            0: "number"
+        }
+
+        // ------------------------------------------------------------
+        // Web / Express
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(web|app|route|when|someone|visits|listen|on|reply|json|serve|folder|start)\b/
+            0: "keyword2"
+        }
+
+        // ------------------------------------------------------------
+        // SQLite
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(database|query|insert|update|delete|execute)\b/
+            0: "builtin"
+        }
+
+        // ------------------------------------------------------------
+        // JavaScript Gateway
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(javascript|ask)\b/
+            0: "keyword2"
+        }
+
+        // ------------------------------------------------------------
+        // Standard library
+        // ------------------------------------------------------------
+
+        {
+            match: /\b(print|show|read|write|readFile|writeFile|fileExists|sleep|time|date|jsonEncode|jsonDecode|env|exit|uuid|uppercase|lowercase|random|round)\b/
+            0: "builtin"
+        }
+
+        // ------------------------------------------------------------
+        // Function names
+        // ------------------------------------------------------------
+
+        {
+            match: /\b[A-Za-z_][A-Za-z0-9_]*(?=[ \t]*\()/
+            0: "function"
+        }
+
+        // ------------------------------------------------------------
+        // Property names
+        // ------------------------------------------------------------
+
+        {
+            match: /\.[A-Za-z_][A-Za-z0-9_]*/
+            0: "property"
+        }
+
+        // ------------------------------------------------------------
+        // Numbers
+        // ------------------------------------------------------------
+
+        {
+            match: /\b[0-9]+(\.[0-9]+)?\b/
+            0: "number"
+        }
+
+        // ------------------------------------------------------------
+        // Generic identifiers
+        // ------------------------------------------------------------
+
+        {
+            match: /\b[A-Za-z_][A-Za-z0-9_]*\b/
+            0: "variable"
+        }
     ]
 }
