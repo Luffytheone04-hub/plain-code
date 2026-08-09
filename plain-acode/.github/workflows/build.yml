@@ -1,0 +1,65 @@
+name: Build Acode Plugin
+
+on:
+  push:
+    tags:
+      - "acode-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: plain-acode
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: plain-acode/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Acode plugin
+        run: npm run build
+
+      - name: Find plugin ZIP
+        id: find_zip
+        shell: bash
+        run: |
+          ZIP=$(find . -maxdepth 3 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP" ]; then
+            echo "No plugin ZIP was produced by the build."
+            exit 1
+          fi
+
+          echo "Found plugin ZIP: $ZIP"
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plain-acode-plugin
+          path: plain-acode/${{ steps.find_zip.outputs.zip }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/acode-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: plain-acode/${{ steps.find_zip.outputs.zip }}
+          generate_release_notes: true

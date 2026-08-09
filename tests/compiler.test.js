@@ -2861,6 +2861,350 @@ test('built-in modules still execute after the dependency-resolution fix', () =>
   if (!out.includes('hello-builtin')) throw new Error(`built-in fs failed. Output:\n${out}`);
 });
 
+// ── Acode syntax highlighting (stream spec) ─────────────────────────────────
+
+// The Acode plugin wraps plain-acode/stream-spec.js in CodeMirror's
+// StreamLanguage. That spec is pure CommonJS, so we can exercise the exact
+// tokenizer here in Node. The shim below mirrors @codemirror/language's
+// StringStream (line-based) and its drive loop, so these tests reflect what
+// Acode's editor will actually highlight.
+
+const streamSpec = require('../plain-acode/stream-spec.js');
+
+class StringStream {
+  constructor(string) {
+    this.string = string;
+    this.pos = 0;
+    this.start = 0;
+  }
+  eol() { return this.pos >= this.string.length; }
+  sol() { return this.pos === 0; }
+  peek() { return this.string.charAt(this.pos) || undefined; }
+  next() {
+    if (this.pos < this.string.length) return this.string.charAt(this.pos++);
+  }
+  eat(match) {
+    const ch = this.string.charAt(this.pos);
+    let ok;
+    if (typeof match === 'string') ok = ch === match;
+    else ok = ch && (match instanceof RegExp ? match.test(ch) : match(ch));
+    if (ok) { this.pos++; return ch; }
+  }
+  eatWhile(match) {
+    const start = this.pos;
+    while (this.eat(match)) { /* keep going */ }
+    return this.pos > start;
+  }
+  eatSpace() {
+    return this.eatWhile(/[\s\u00a0]/);
+  }
+  skipToEnd() { this.pos = this.string.length; }
+  skipTo(ch) {
+    const found = this.string.indexOf(ch, this.pos);
+    if (found > -1) { this.pos = found; return true; }
+  }
+  backUp(n) { this.pos = Math.max(0, this.pos - n); }
+  match(pattern, consume, caseInsensitive) {
+    if (typeof pattern === 'string') {
+      const cased = (s) => (caseInsensitive ? s.toLowerCase() : s);
+      const sub = this.string.substr(this.pos, pattern.length);
+      if (cased(sub) === cased(pattern)) {
+        if (consume !== false) this.pos += pattern.length;
+        return true;
+      }
+      return null;
+    }
+    const m = this.string.slice(this.pos).match(pattern);
+    if (m && m.index > 0) return null;
+    if (m && consume !== false) this.pos += m[0].length;
+    return m;
+  }
+  current() { return this.string.slice(this.start, this.pos); }
+}
+
+// Drive the stream spec exactly like @codemirror/language does: one
+// StringStream per line, token() called until end-of-line.
+function highlight(source) {
+  const state = streamSpec.startState(4);
+  const tokens = [];
+  for (const line of source.split('\n')) {
+    const stream = new StringStream(line);
+    while (!stream.eol()) {
+      stream.start = stream.pos;
+      const type = streamSpec.token(stream, state);
+      if (type) tokens.push({ type, text: stream.current() });
+    }
+  }
+  return tokens;
+}
+
+function highlightType(source, text) {
+  const tokens = highlight(source);
+  for (const token of tokens) {
+    if (token.text === text) return token.type;
+  }
+  return null;
+}
+
+function highlightLastType(source, text) {
+  const tokens = highlight(source);
+  let type = null;
+  for (const token of tokens) {
+    if (token.text === text) type = token.type;
+  }
+  return type;
+}
+
+// The exact set of legacy token names the spec may emit. StreamLanguage
+// resolves these against the tokenTable in plain-acode/main.js.
+const ALLOWED_TOKENS = new Set([
+  'keyword', 'operator', 'string', 'string-2', 'number', 'comment',
+  'variable', 'property', 'function', 'builtin', 'atom', 'meta',
+  'punctuation', 'invalid',
+]);
+
+console.log('\nAcode syntax highlighting (stream spec)');
+
+test('highlight: keywords, variables, strings, numbers, comments', () => {
+  const src = [
+    'remember name as "World"',
+    'show "Hello, " + name + "!"',
+    '// a comment',
+    'note: a documentation comment',
+    'remember pi as 3.14',
+  ].join('\n');
+  if (highlightType(src, 'remember') !== 'keyword') throw new Error('remember not keyword');
+  if (highlightType(src, 'name') !== 'variable') throw new Error('name not variable');
+  if (highlightType(src, 'as') !== 'operator') throw new Error('as not operator');
+  if (highlightType(src, '"World"') !== 'string') throw new Error('string not string');
+  if (highlightType(src, 'show') !== 'keyword') throw new Error('show not keyword');
+  if (highlightType(src, '// a comment') !== 'comment') throw new Error('comment not comment');
+  if (highlightType(src, 'note: a documentation comment') !== 'comment') {
+    throw new Error('note: documentation comment not comment');
+  }
+  if (highlightType(src, '3.14') !== 'number') throw new Error('number not number');
+  if (highlightType(src, 'pi') !== 'variable') throw new Error('pi not variable');
+});
+
+test('highlight: control flow and block delimiters', () => {
+  const src = [
+    'if score is at least 90',
+    '  show "A grade"',
+    'otherwise',
+    '  show "B grade"',
+    'done',
+  ].join('\n');
+  for (const word of ['if', 'otherwise', 'done', 'show']) {
+    if (highlightType(src, word) !== 'keyword') {
+      throw new Error(`control word "${word}" not keyword`);
+    }
+  }
+});
+
+test('highlight: multi-word comparison phrases are operators', () => {
+  const src = [
+    'is above', 'is below', 'is at least', 'is at most', 'is not',
+    'is empty', 'is not empty', 'contains', 'starts with', 'ends with',
+    'between 80 and 89', 'is greater than', 'is less than',
+  ].join('\n');
+  for (const word of ['is', 'above', 'below', 'at', 'least', 'most', 'not',
+    'empty', 'contains', 'starts', 'ends', 'with', 'between', 'and',
+    'greater', 'less', 'than']) {
+    if (highlightType(src, word) !== 'operator') {
+      throw new Error(`comparison word "${word}" not operator`);
+    }
+  }
+});
+
+test('highlight: route paths are special strings', () => {
+  const src = [
+    'route "/"',
+    '  reply "Hello from Plain!"',
+    'done',
+    'when someone visits "/api/status"',
+    '  reply json',
+    '    status is "ok"',
+    '    version is "1.0"',
+    '  done',
+    'done',
+  ].join('\n');
+  if (highlightType(src, '"/"') !== 'string-2') throw new Error('route root path not string-2');
+  if (highlightType(src, '"/api/status"') !== 'string-2') throw new Error('route path not string-2');
+  if (highlightType(src, '"Hello from Plain!"') !== 'string') throw new Error('reply string not plain string');
+  for (const word of ['route', 'visits', 'json']) {
+    if (highlightType(src, word) !== 'keyword') throw new Error(`${word} not keyword`);
+  }
+});
+
+test('highlight: web app shorthand and listen', () => {
+  const src = [
+    'web app',
+    'listen on 3000',
+    '  show "Server running"',
+    'done',
+  ].join('\n');
+  for (const word of ['web', 'app', 'listen', 'on']) {
+    if (highlightType(src, word) !== 'keyword') throw new Error(`${word} not keyword`);
+  }
+  if (highlightType(src, '3000') !== 'number') throw new Error('port not number');
+});
+
+test('highlight: use statements highlight module names as builtins', () => {
+  const src = [
+    'use express',
+    'use node-fetch',
+    'use @scope/package-name',
+    'use fs',
+  ].join('\n');
+  if (highlightType(src, 'use') !== 'keyword') throw new Error('use not keyword');
+  for (const pkg of ['express', 'node-fetch', '@scope/package-name', 'fs']) {
+    if (highlightType(src, pkg) !== 'builtin') throw new Error(`package ${pkg} not builtin`);
+  }
+});
+
+test('highlight: stdlib calls are builtins, user calls are functions', () => {
+  const src = [
+    'make greet(name)',
+    '  give "Hello, " + name',
+    'done',
+    'greet("World")',
+    'remember encoded as jsonEncode(user)',
+    'show readFile("a.txt")',
+  ].join('\n');
+  if (highlightType(src, 'make') !== 'keyword') throw new Error('make not keyword');
+  if (highlightType(src, 'give') !== 'keyword') throw new Error('give not keyword');
+  if (highlightType(src, 'greet') !== 'function') throw new Error('function name not function');
+  for (const call of ['jsonEncode', 'readFile']) {
+    if (highlightType(src, call) !== 'builtin') throw new Error(`stdlib call ${call} not builtin`);
+  }
+});
+
+test('highlight: v1.1 expression words and number words', () => {
+  const src = [
+    'show first player from players',
+    'show player three from players',
+    'show players length',
+    'show name of user',
+    'add("Palmer" to players)',
+    'remove("Foden" from players)',
+    'write("Saved" to "notes.txt")',
+  ].join('\n');
+  for (const word of ['first', 'from', 'of', 'to']) {
+    if (highlightType(src, word) !== 'operator') {
+      throw new Error(`expression word "${word}" not operator`);
+    }
+  }
+  if (highlightType(src, 'length') !== 'operator') throw new Error('postfix length not operator');
+  if (highlightType(src, 'three') !== 'number') throw new Error('number word "three" not number');
+  if (highlightType(src, 'add') !== 'function') throw new Error('add not function');
+  if (highlightType(src, 'remove') !== 'function') throw new Error('remove not function');
+  if (highlightType(src, 'write') !== 'builtin') throw new Error('write not builtin');
+  if (highlightType(src, 'players') !== 'variable') throw new Error('players not variable');
+});
+
+test('highlight: database and SQL blocks', () => {
+  const src = [
+    'database "app.db"',
+    'execute',
+    '  CREATE TABLE IF NOT EXISTS users (id INTEGER)',
+    'done',
+    'query',
+    '  SELECT * FROM users',
+    'done',
+  ].join('\n');
+  if (highlightType(src, 'database') !== 'keyword') throw new Error('database not keyword');
+  if (highlightType(src, 'execute') !== 'keyword') throw new Error('execute not keyword');
+  if (highlightType(src, 'query') !== 'keyword') throw new Error('query not keyword');
+  const tokens = highlight(src);
+  if (!tokens.some((t) => t.type === 'meta' && t.text.includes('CREATE TABLE'))) {
+    throw new Error('execute body not highlighted as meta');
+  }
+  if (!tokens.some((t) => t.type === 'meta' && t.text.includes('SELECT * FROM'))) {
+    throw new Error('query body not highlighted as meta');
+  }
+});
+
+test('highlight: javascript gateway block highlights JS inside and Plain after', () => {
+  const src = [
+    'remember response as javascript',
+    '  const value = 42',
+    '  return value',
+    'done',
+    'show response',
+  ].join('\n');
+  if (highlightType(src, 'javascript') !== 'keyword') throw new Error('javascript not keyword');
+  for (const word of ['const', 'return']) {
+    if (highlightType(src, word) !== 'keyword') throw new Error(`JS word "${word}" not keyword in block`);
+  }
+  if (highlightType(src, '42') !== 'number') throw new Error('JS number not number');
+  if (highlightLastType(src, 'done') !== 'keyword') throw new Error('gateway done not keyword');
+  if (highlightType(src, 'show') !== 'keyword') throw new Error('Plain after gateway not highlighted');
+});
+
+test('highlight: only a line exactly equal to done terminates the JS block', () => {
+  const src = [
+    'remember x as javascript',
+    '  const done = 1',
+    '  return done',
+    'done',
+  ].join('\n');
+  if (highlightType(src, 'const') !== 'keyword') throw new Error('const not keyword in block');
+  if (highlightType(src, 'return') !== 'keyword') throw new Error('return not keyword in block');
+  if (highlightType(src, 'done') !== 'variable') throw new Error('JS variable named done mis-typed');
+  if (highlightLastType(src, 'done') !== 'keyword') throw new Error('terminator done not keyword');
+});
+
+test('highlight: JS operators inside javascript blocks (incl. slash operators)', () => {
+  const src = [
+    'remember ratio as javascript',
+    '  let total = 10',
+    '  total /= 2',
+    '  total %= 3',
+    '  const half = total / 2',
+    '  const ok = (total === 5) && (total != 0)',
+    '  return total <= 5 ? "yes" : "no"',
+    'done',
+  ].join('\n');
+  for (const op of ['=', '/=', '%=', '/', '===', '!=', '&', '<=', '?', ':']) {
+    if (highlightType(src, op) !== 'operator') {
+      throw new Error(`JS operator "${op}" not operator`);
+    }
+  }
+  for (const word of ['let', 'const', 'return']) {
+    if (highlightType(src, word) !== 'keyword') throw new Error(`JS keyword "${word}" not keyword`);
+  }
+});
+
+test('highlight: atoms, invalid characters, and operator set', () => {
+  const src = [
+    'remember isStudent as true',
+    'show age + 1',
+    'remember x as y;',
+  ].join('\n');
+  if (highlightType(src, 'true') !== 'atom') throw new Error('true not atom');
+  if (highlightType(src, '+') !== 'operator') throw new Error('+ not operator');
+  if (highlightType(src, ';') !== 'invalid') throw new Error('; should be invalid in Plain');
+});
+
+test('highlight: every emitted token type is a known legacy token', () => {
+  const files = [
+    'hello.pln', 'variables.pln', 'conditions.pln', 'expressions.pln',
+    'loops.pln', 'functions.pln', 'stdlib.pln', 'web-server.pln',
+    'database.pln',
+  ].map((name) => path.join(__dirname, '..', 'samples', name)).concat([
+    path.join(__dirname, 'fixtures', 'gateway_js.pln'),
+    path.join(__dirname, 'fixtures', 'gateway_ask.pln'),
+  ]);
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const token of highlight(source)) {
+      if (!ALLOWED_TOKENS.has(token.type)) {
+        throw new Error(`${file}: unknown token type ${token.type}`);
+      }
+    }
+  }
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);

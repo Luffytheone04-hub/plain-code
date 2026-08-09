@@ -447,6 +447,24 @@ Install `plain-vscode` for:
 
 See `plain-vscode/README.md` for installation instructions.
 
+### Acode Editor
+
+Acode support (`plain-acode/`) provides syntax highlighting and `.pln` file
+recognition in the [Acode](https://acode.app) Android editor, using Acode's
+modern CodeMirror 6 `editorLanguages` API.
+
+Install it by zipping the `plain-acode/` folder contents (`plugin.json`,
+`main.js`, `stream-spec.js`, `README.md`) and selecting the zip in Acode:
+Settings → Plugins → "+".
+
+Acode support highlights keywords, comparisons, strings, numbers, comments,
+route paths, `use` package names, stdlib calls, v1.1 expressions, number
+words, and JavaScript/SQL blocks. It does **not** provide LSP diagnostics,
+autocomplete, or compiler execution. The tokenizer in `stream-spec.js` is
+pure CommonJS and is exercised by the test suite (`tests/compiler.test.js`).
+
+See `plain-acode/README.md` for details.
+
 ---
 
 ## Project Management
