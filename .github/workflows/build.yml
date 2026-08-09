@@ -23,41 +23,42 @@ jobs:
     name: Build Acode Plugin
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: plain-acode
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          package-manager-cache: false
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run tests
+      - name: Run Plain tests
         run: npm test
 
-      - name: Build Acode plugin
-        run: npm run build
-
-      - name: Show build output
+      - name: Verify Acode plugin files
         run: |
-          echo "Build contents:"
-          ls -lah
+          test -f plain-acode/plugin.json
+          test -f plain-acode/main.js
+
+          echo "Acode plugin files:"
+          ls -lah plain-acode
+
+      - name: Package Acode plugin
+        run: |
+          mkdir -p dist
+
+          cd plain-acode
+          zip -r ../dist/plain-acode-plugin.zip . \
+            -x "*.git*" \
+            -x "node_modules/*"
+
+      - name: Verify plugin ZIP
+        run: |
+          echo "Plugin package:"
+          ls -lh dist/plain-acode-plugin.zip
 
           echo
-          echo "ZIP files:"
-          find . -maxdepth 3 -type f -name "*.zip" -print
+          echo "ZIP contents:"
+          unzip -l dist/plain-acode-plugin.zip
 
       - name: Upload Acode plugin
         uses: actions/upload-artifact@v4
         with:
           name: plain-acode-plugin
-          path: plain-acode/**/*.zip
+          path: dist/plain-acode-plugin.zip
           if-no-files-found: error
