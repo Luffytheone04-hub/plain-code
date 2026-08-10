@@ -41,8 +41,11 @@ diagnostics, autocomplete, formatting, or terminal integration.
 ## Compatibility
 
 - Requires Acode's CodeMirror 6 editor (`minVersionCode` 290).
-- Uses `acode.require("editorLanguages")`; the legacy `aceModes` API is
-  intentionally not used.
+- Registers the `.pln` language through `acode.require("editorLanguages")`
+  (modern API). If `editorLanguages` is missing (older Ace-based Acode
+  builds), the plugin falls back to the legacy `aceModes` API. If neither
+  API is available, the plugin fails gracefully with a descriptive console
+  error instead of throwing an opaque TypeError.
 
 ## Development
 

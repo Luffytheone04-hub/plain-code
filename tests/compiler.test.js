@@ -3205,7 +3205,175 @@ test('highlight: every emitted token type is a known legacy token', () => {
   }
 });
 
+// ── Acode plugin loading (editorLanguages / aceModes) ────────────────────────
+
+const {
+  PlainLanguagePlugin,
+  LANGUAGE_NAME,
+  EXTENSIONS,
+} = require('../plain-acode/main.js');
+
+// The suite's test() helper is synchronous, so plugin tests that await the
+// async init() run through this helper and are joined with the summary below.
+const pendingPluginTests = [];
+let lastPluginTest = Promise.resolve();
+
+function testAsync(name, fn) {
+  const run = () => fn().then(
+    () => { console.log(`  PASS  ${name}`); passed++; },
+    (e) => { console.log(`  FAIL  ${name}`); console.log(`        ${e.message}`); failed++; },
+  );
+  lastPluginTest = lastPluginTest.then(run, run);
+  pendingPluginTests.push(lastPluginTest);
+}
+
+function makeMockAcode(modules) {
+  return {
+    require(name) {
+      return Object.prototype.hasOwnProperty.call(modules, name) ? modules[name] : undefined;
+    },
+  };
+}
+
+const cmLanguageMock = { StreamLanguage: { define: (spec) => ({ spec }) } };
+const lezerHighlightMock = {
+  tags: {
+    function: (t) => t,
+    standard: (t) => t,
+    special: (t) => t,
+    variableName: 'variableName',
+    string: 'string',
+    propertyName: 'propertyName',
+    meta: 'meta',
+    atom: 'atom',
+    invalid: 'invalid',
+  },
+};
+
+console.log('\nAcode plugin loading (editorLanguages / aceModes)');
+
+testAsync('plugin: registers via modern editorLanguages when available', async () => {
+  let call = null;
+  const acode = makeMockAcode({
+    editorLanguages: {
+      register(name, extensions, caption, loader) {
+        call = { name, extensions, caption, loader };
+        return Promise.resolve();
+      },
+      unregister() {},
+    },
+    '@codemirror/language': cmLanguageMock,
+    '@lezer/highlight': lezerHighlightMock,
+  });
+  const plugin = new PlainLanguagePlugin(acode);
+  const usedPath = await plugin.init();
+  if (usedPath !== 'editorLanguages') throw new Error('init did not use editorLanguages');
+  if (!call) throw new Error('editorLanguages.register was not called');
+  if (call.name !== LANGUAGE_NAME) throw new Error(`unexpected mode name: ${call.name}`);
+  if (JSON.stringify(call.extensions) !== JSON.stringify(EXTENSIONS)) {
+    throw new Error(`unexpected extensions: ${JSON.stringify(call.extensions)}`);
+  }
+  const language = await call.loader();
+  if (!Array.isArray(language) || !language[0] || !language[0].spec) {
+    throw new Error('loader did not return a StreamLanguage extension');
+  }
+  if (language[0].spec.name !== 'plain') throw new Error('loader returned the wrong spec');
+});
+
+testAsync('plugin: falls back to legacy aceModes when editorLanguages is missing', async () => {
+  let call = null;
+  const acode = makeMockAcode({
+    aceModes: {
+      addMode(name, extensions, caption) {
+        call = { name, extensions, caption };
+        return Promise.resolve();
+      },
+      removeMode() {},
+    },
+  });
+  const plugin = new PlainLanguagePlugin(acode);
+  const usedPath = await plugin.init();
+  if (usedPath !== 'aceModes') throw new Error('init did not fall back to aceModes');
+  if (!call) throw new Error('aceModes.addMode was not called');
+  if (call.name !== LANGUAGE_NAME) throw new Error(`unexpected mode name: ${call.name}`);
+  if (JSON.stringify(call.extensions) !== JSON.stringify(EXTENSIONS)) {
+    throw new Error(`unexpected extensions: ${JSON.stringify(call.extensions)}`);
+  }
+});
+
+testAsync('plugin: fails gracefully when neither API is available', async () => {
+  const acode = makeMockAcode({});
+  const plugin = new PlainLanguagePlugin(acode);
+  let error = null;
+  try {
+    await plugin.init();
+  } catch (e) {
+    error = e;
+  }
+  if (!error) throw new Error('init resolved even though neither API is available');
+  if (!error.message.includes('editorLanguages') || !error.message.includes('aceModes')) {
+    throw new Error(`error message is not descriptive: ${error.message}`);
+  }
+  if (plugin.registration !== null) throw new Error('failed init left a registration behind');
+});
+
+testAsync('plugin: cleanup after modern editorLanguages registration', async () => {
+  let unregistered = null;
+  const acode = makeMockAcode({
+    editorLanguages: {
+      register() { return Promise.resolve(); },
+      unregister(name) { unregistered = name; },
+    },
+    '@codemirror/language': cmLanguageMock,
+    '@lezer/highlight': lezerHighlightMock,
+  });
+  const plugin = new PlainLanguagePlugin(acode);
+  await plugin.init();
+  plugin.destroy();
+  if (unregistered !== LANGUAGE_NAME) {
+    throw new Error('editorLanguages.unregister was not called with the mode name');
+  }
+});
+
+testAsync('plugin: cleanup after legacy aceModes registration', async () => {
+  let removed = null;
+  const acode = makeMockAcode({
+    aceModes: {
+      addMode() { return Promise.resolve(); },
+      removeMode(name) { removed = name; },
+    },
+  });
+  const plugin = new PlainLanguagePlugin(acode);
+  await plugin.init();
+  plugin.destroy();
+  if (removed !== LANGUAGE_NAME) {
+    throw new Error('aceModes.removeMode was not called with the mode name');
+  }
+});
+
+testAsync('plugin: main.js wires init/unmount on the acode global', async () => {
+  let initFn = null;
+  let unmountFn = null;
+  const globalAcode = {
+    require() { return undefined; },
+    setPluginInit(id, fn) { initFn = fn; },
+    setPluginUnmount(id, fn) { unmountFn = fn; },
+  };
+  const mainPath = require.resolve('../plain-acode/main.js');
+  delete require.cache[mainPath];
+  global.acode = globalAcode;
+  try {
+    require('../plain-acode/main.js');
+  } finally {
+    delete global.acode;
+  }
+  if (typeof initFn !== 'function') throw new Error('main.js did not call acode.setPluginInit');
+  if (typeof unmountFn !== 'function') throw new Error('main.js did not call acode.setPluginUnmount');
+});
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
-console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+Promise.all(pendingPluginTests).then(() => {
+  console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
+  if (failed > 0) process.exit(1);
+});
