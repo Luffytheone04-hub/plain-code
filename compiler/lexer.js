@@ -303,6 +303,10 @@ function tokenize(source) {
     }
 
     // Single-character punctuation
+    if (source[i] === '{') { tokens.push({ type: TOKEN.LBRACE, value: '{', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '}') { tokens.push({ type: TOKEN.RBRACE, value: '}', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === ':') { tokens.push({ type: TOKEN.COLON, value: ':', line: tokenLine, col: tokenCol }); i++; continue; }
+    if (source[i] === '-' && source[i + 1] === '>') { tokens.push({ type: TOKEN.ARROW, value: '->', line: tokenLine, col: tokenCol }); i += 2; continue; }
     if (source[i] === '(') { tokens.push({ type: TOKEN.LPAREN,   value: '(', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === ')') { tokens.push({ type: TOKEN.RPAREN,   value: ')', line: tokenLine, col: tokenCol }); i++; continue; }
     if (source[i] === '[') { tokens.push({ type: TOKEN.LBRACKET, value: '[', line: tokenLine, col: tokenCol }); i++; continue; }

@@ -201,12 +201,13 @@ function parse(tokens) {
     if (token.type === TOKEN.WHILE)       return parseWhile();
     if (token.type === TOKEN.USE)         return parseUse();
     if (token.type === TOKEN.IMPORT)      return parseImport();
-    if (token.type === TOKEN.WHEN)        return parseRoute();
+    if (token.type === TOKEN.WHEN)        return parseWhen();
     if (token.type === TOKEN.LISTEN)      return parseListen();
     if (token.type === TOKEN.REPLY)       return parseReply();
     if (token.type === TOKEN.SERVE)       return parseServeFolder();
     // v1.1.1 — JavaScript Gateway
     if (token.type === TOKEN.ASK)         return parseAsk();
+    if (token.type === TOKEN.JAVASCRIPT_KW) return parseJavaScriptBlock();
     // v0.6
     if (token.type === TOKEN.WEB)         return parseWebApp();
     if (token.type === TOKEN.ROUTE_KW)    return parseSimpleRoute();
@@ -309,6 +310,22 @@ function parse(tokens) {
     return { type: 'AskStatement', variable };
   }
 
+  // javascript\n  <raw JS>\ndone  — statement-level JavaScript block.
+  // Mirrors the `remember <name> as javascript` form but produces no value.
+  function parseJavaScriptBlock() {
+    consume(TOKEN.JAVASCRIPT_KW);
+    const bodyToken = peek();
+    if (bodyToken.type !== TOKEN.JS_BODY) {
+      throw new Error(makeError(
+        'Expected a JavaScript block after "javascript".\n\nExample:\n  javascript\n    console.log("hi")\n  done',
+        bodyToken
+      ));
+    }
+    const body = advance().value; // consume JS_BODY
+    consume(TOKEN.DONE, 'Expected "done" to close the JavaScript block.');
+    return { type: 'JavaScriptBlock', name: null, body };
+  }
+
   function parseShow() {
     consume(TOKEN.SHOW);
     const value = parseExpression();
@@ -391,17 +408,66 @@ function parse(tokens) {
     return { type: 'UseStatement', module: token.value };
   }
 
-  // when someone visits "<path>" ... done
-  function parseRoute() {
+  // when someone visits "<path>" ... done     → Express route
+  // when someone sends "<command>" ... done    → Telegram command handler
+  // when someone sends matching "<pattern>" ... done
+  // when someone clicks "<data>" ... done      → Telegram callback handler
+  function parseWhen() {
     consume(TOKEN.WHEN);
     consume(TOKEN.SOMEONE,
       'Expected "someone" after "when".\n\nExample:\n  when someone visits "/"\n    reply "Hello"\n  done');
+    const next = peek();
+
+    if (next.type === TOKEN.VISITS) return parseRouteBody();
+
+    if (next.type === TOKEN.IDENTIFIER && next.value === 'sends') {
+      advance();
+      return parseTelegramCommand();
+    }
+
+    if (next.type === TOKEN.IDENTIFIER && next.value === 'clicks') {
+      advance();
+      return parseTelegramCallback();
+    }
+
+    throw new Error(makeError(
+      'Expected "visits", "sends", or "clicks" after "when someone".\n\nExamples:\n  when someone visits "/"\n  when someone sends "/start"\n  when someone clicks "about"',
+      next
+    ));
+  }
+
+  // Parses the route body after `when someone visits "<path>"`.
+  function parseRouteBody() {
     consume(TOKEN.VISITS,
       'Expected "visits" after "someone".\n\nExample:\n  when someone visits "/"');
     const routePath = consume(TOKEN.STRING,
       'Expected a route path string after "visits".\n\nExample:\n  when someone visits "/"').value;
     const body = parseBody('route');
     return { type: 'RouteStatement', path: routePath, body };
+  }
+
+  // when someone sends "<command>" ... done
+  // when someone sends matching "<pattern>" ... done
+  function parseTelegramCommand() {
+    let isPattern = false;
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'matching') {
+      isPattern = true;
+      advance();
+    }
+    const command = consume(TOKEN.STRING,
+      isPattern
+        ? 'Expected a pattern string after "matching".\n\nExample:\n  when someone sends matching "/echo (.+)"'
+        : 'Expected a command string after "sends".\n\nExample:\n  when someone sends "/start"\n    reply "Hello"\n  done').value;
+    const body = parseBody('"when someone sends" block');
+    return { type: 'TelegramCommandStatement', command, isPattern, body };
+  }
+
+  // when someone clicks "<data>" ... done
+  function parseTelegramCallback() {
+    const data = consume(TOKEN.STRING,
+      'Expected a button name string after "clicks".\n\nExample:\n  when someone clicks "about"\n    reply "About Plain"\n  done').value;
+    const body = parseBody('"when someone clicks" block');
+    return { type: 'TelegramCallbackStatement', data, body };
   }
 
   // listen on <port> ... done
@@ -437,7 +503,50 @@ function parse(tokens) {
       return { type: 'ReplyJsonStatement', properties };
     }
     const value = parseExpression();
+
+    // reply <value> with buttons ... done → Telegram inline keyboard block.
+    if (peek().type === TOKEN.WITH &&
+        peekAt(1).type === TOKEN.IDENTIFIER && peekAt(1).value === 'buttons') {
+      advance(); // with
+      advance(); // buttons
+      const buttons = parseButtonBlock();
+      return { type: 'ReplyWithButtonsStatement', value, buttons };
+    }
+
     return { type: 'ReplyStatement', value };
+  }
+
+  // Inline keyboard rows inside a "reply ... with buttons ... done" block.
+  // Each line is one button; a comma joins buttons on the same line into one
+  // row; a blank line between button lines starts a new row.
+  function parseButtonBlock() {
+    const rows = [];
+    let currentRow = [];
+    let prevLine = null;
+    while (peek().type !== TOKEN.DONE) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(makeError(
+          'Expected "done" to close the buttons block before end of file.',
+          peek()
+        ));
+      }
+      if (currentRow.length > 0 && prevLine !== null && peek().line > prevLine + 1) {
+        rows.push(currentRow);
+        currentRow = [];
+      }
+      const text = consume(TOKEN.STRING,
+        'Expected a button label string inside the buttons block.\n\nExample:\n  reply "Choose" with buttons\n    "About" -> "about"\n  done');
+      consume(TOKEN.ARROW,
+        'Expected "->" after the button label.\n\nExample:\n  "About" -> "about"');
+      const data = consume(TOKEN.STRING,
+        'Expected a callback string after "->".\n\nExample:\n  "About" -> "about"');
+      currentRow.push({ text: text.value, data: data.value });
+      prevLine = data.line;
+      if (peek().type === TOKEN.COMMA) advance();
+    }
+    if (currentRow.length > 0) rows.push(currentRow);
+    advance(); // consume DONE
+    return rows;
   }
 
   // serve folder "<path>"
@@ -475,8 +584,22 @@ function parse(tokens) {
   }
 
   // start <port>
+  // start telegram bot  — explicit Telegram startup marker. Polling keeps
+  // the bot alive, so this form is only for documentation/intent.
   function parseStart() {
     consume(TOKEN.START_KW);
+    if (peek().type === TOKEN.IDENTIFIER && peek().value === 'telegram') {
+      advance();
+      const botToken = peek();
+      if (botToken.type !== TOKEN.IDENTIFIER || botToken.value !== 'bot') {
+        throw new Error(makeError(
+          'Expected "bot" after "telegram".\n\nExample:\n  start telegram bot',
+          botToken
+        ));
+      }
+      advance();
+      return { type: 'TelegramStartStatement' };
+    }
     const port = parseExpression();
     return { type: 'StartStatement', port };
   }
@@ -671,6 +794,7 @@ function parse(tokens) {
     if (token.type === TOKEN.STRING)   { advance(); return { type: 'StringLiteral',  value: token.value }; }
     if (token.type === TOKEN.NUMBER)   { advance(); return { type: 'NumberLiteral',  value: token.value }; }
     if (token.type === TOKEN.LBRACKET) { return parseArrayLiteral(); }
+    if (token.type === TOKEN.LBRACE)   { return parseInlineObjectLiteral(); }
 
     if (token.type === TOKEN.IDENTIFIER) {
       if (peekAt(1).type === TOKEN.LPAREN) return parseCallExpression();
@@ -697,6 +821,35 @@ function parse(tokens) {
     }
     consume(TOKEN.RBRACKET, 'Expected "]" to close the array.');
     return { type: 'ArrayLiteral', elements };
+  }
+
+  // v1.2 — Inline object literal: { key: value, ... }
+  function parseInlineObjectLiteral() {
+    consume(TOKEN.LBRACE);
+    const properties = [];
+    while (peek().type !== TOKEN.RBRACE) {
+      if (peek().type === TOKEN.EOF) {
+        throw new Error(makeError(
+          'Expected "}" to close the inline object before end of file.',
+          peek()
+        ));
+      }
+      const keyToken = peek();
+      if (keyToken.type !== TOKEN.IDENTIFIER && keyToken.type !== TOKEN.STRING) {
+        throw new Error(makeError(
+          'Expected a property name inside the inline object.\n\nExample:\n  { text: "hi" }',
+          keyToken
+        ));
+      }
+      advance();
+      const key = keyToken.value;
+      consume(TOKEN.COLON, `Expected ":" after property name "${key}".\n\nExample:\n  { ${key}: "hi" }`);
+      const value = parseExpression();
+      properties.push({ key, value });
+      if (peek().type === TOKEN.COMMA) advance();
+    }
+    consume(TOKEN.RBRACE, 'Expected "}" to close the inline object.');
+    return { type: 'InlineObjectLiteral', properties };
   }
 
   // Object literal body: key is value  ...  done

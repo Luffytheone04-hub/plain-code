@@ -48,7 +48,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.plain",
-                    "match": "\\b(if|otherwise|done|for|each|every|in|while|when|listen)\\b"
+                    "match": "\\b(if|otherwise|done|for|each|every|in|while|when|listen|javascript)\\b"
                 },
                 {
                     "name": "keyword.declaration.plain",
@@ -72,11 +72,11 @@
                 },
                 {
                     "name": "keyword.other.plain",
-                    "match": "\\b(someone|visits|on|folder|json)\\b"
+                    "match": "\\b(someone|visits|sends|clicks|matching|on|folder|json)\\b"
                 },
                 {
                     "name": "support.function.stdlib.plain",
-                    "match": "\\b(readFile|writeFile|fileExists|sleep|time|date|jsonEncode|jsonDecode|env|exit|uuid)(?=\\s*\\()"
+                    "match": "\\b(readFile|writeFile|fileExists|sleep|time|date|jsonEncode|jsonDecode|env|exit|uuid|bot|sendMessage|sendPhoto|getChat|getMyChats|editMessage)(?=\\s*\\()"
                 },
                 {
                     "name": "constant.language.plain",
@@ -86,6 +86,10 @@
         },
         "operators": {
             "patterns": [
+                {
+                    "name": "keyword.operator.arrow.plain",
+                    "match": "->"
+                },
                 {
                     "name": "keyword.operator.arithmetic.plain",
                     "match": "[+\\-*/%]"
@@ -97,6 +101,14 @@
                 {
                     "name": "punctuation.separator.comma.plain",
                     "match": ","
+                },
+                {
+                    "name": "punctuation.section.braces.plain",
+                    "match": "[{}]"
+                },
+                {
+                    "name": "punctuation.separator.key-value.plain",
+                    "match": ":"
                 }
             ]
         },

@@ -20,6 +20,9 @@ const INDENT_STARTERS = [
   /^for\s+(each|every)\s+/,   // for each ... / for every ...
   /^while\s+/,                 // while ...
   /^when\s+someone\s+visits/,  // when someone visits ...
+  /^when\s+someone\s+(sends|clicks)\b/, // when someone sends / clicks (Telegram)
+  /^javascript\b/,             // javascript raw JS block (v1.2)
+  /^reply\b.*\bwith\s+buttons\s*$/, // reply ... with buttons ... done (v1.2)
   /^listen\s+on\s+/,           // listen on ...
   /^reply\s+json\b/,           // reply json
   /^remember\s+\S+\s+as\s*$/,  // remember x as   (object literal, ends with "as")
@@ -121,7 +124,8 @@ function format(source) {
 
     // Opening keywords: increase depth AFTER printing this line.
     if (opensBlock(content)) {
-      if (/^remember\s+\S+\s+as\s+javascript\s*$/.test(content)) inJsBlock = true;
+      if (/^remember\s+\S+\s+as\s+javascript\s*$/.test(content) ||
+          /^javascript\s*$/.test(content)) inJsBlock = true;
       depth++;
     }
 

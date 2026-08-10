@@ -43,6 +43,116 @@ const BUILTIN_DECLARATIONS = {
     `  }`,
     `}`,
   ].join('\n'),
+  // v1.2 — Telegram runtime. Polling-based: no webhook endpoint needed.
+  // Exposes `Telegram` (the raw API client) plus a `createTelegramBot(token)`
+  // factory that registers handlers and polls getUpdates in a loop. `BOT` is
+  // assigned by `bot "<token>"`. The token also falls back to the
+  // TELEGRAM_BOT_TOKEN environment variable at call time.
+  telegram: [
+    `const Telegram = (() => {`,
+    `  const token = process.env.TELEGRAM_BOT_TOKEN;`,
+    `  const base = 'https://api.telegram.org/bot' + token;`,
+    `  const call = async (method, params = {}) => {`,
+    `    if (!token) throw new Error('Telegram: TELEGRAM_BOT_TOKEN is not set. Use: bot "YOUR_BOT_TOKEN"');`,
+    `    const response = await fetch(base + '/' + method, {`,
+    `      method: 'POST',`,
+    `      headers: { 'Content-Type': 'application/json' },`,
+    `      body: JSON.stringify(params),`,
+    `    });`,
+    `    const json = await response.json();`,
+    `    if (!json.ok) throw new Error('Telegram: ' + method + ' failed: ' + JSON.stringify(json));`,
+    `    return json.result;`,
+    `  };`,
+    `  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));`,
+    `  const chats = new Map();`,
+    `  const handlers = { command: [], pattern: [], callback: [] };`,
+    `  const keyboard = (rows) => ({`,
+    `    reply_markup: {`,
+    `      inline_keyboard: rows.map((row) => row.map(([text, data]) => ({ text, callback_data: data }))),`,
+    `    },`,
+    `  });`,
+    `  return {`,
+    `    call, chats, handlers, keyboard,`,
+    `    sendMessage: async (chatId, text, rows) => call('sendMessage', {`,
+    `      chat_id: chatId,`,
+    `      text: String(text),`,
+    `      ...(rows ? keyboard(rows) : {}),`,
+    `    }),`,
+    `    sendPhoto: async (chatId, photo, caption) => call('sendPhoto', {`,
+    `      chat_id: chatId,`,
+    `      photo,`,
+    `      ...(caption ? { caption } : {}),`,
+    `    }),`,
+    `    getChat: async (chatId) => call('getChat', { chat_id: chatId }),`,
+    `    getMyChats: async () => {`,
+    `      const updates = await call('getUpdates', {});`,
+    `      for (const update of updates) {`,
+    `        const chat = (update.message || update.callback_query || {}).chat;`,
+    `        if (chat && !chats.has(chat.id)) chats.set(chat.id, chat);`,
+    `      }`,
+    `      return [...chats.values()];`,
+    `    },`,
+    `    editMessage: async (chatId, messageId, text) => call('editMessageText', {`,
+    `      chat_id: chatId,`,
+    `      message_id: messageId,`,
+    `      text: String(text),`,
+    `    }),`,
+    `  };`,
+    `})();`,
+    `let BOT;`,
+    `async function createTelegramBot(token) {`,
+    `  const botToken = token || process.env.TELEGRAM_BOT_TOKEN;`,
+    `  if (!botToken) throw new Error('Telegram: bot token is missing. Use: bot "YOUR_BOT_TOKEN"');`,
+    `  let offset = 0;`,
+    `  const onText = async (chatId, text) => {`,
+    `    for (const { matcher, handler } of handlers.pattern) {`,
+    `      const match = text.match(matcher);`,
+    `      if (match) { await handler({ chatId, text, matches: match }); return; }`,
+    `    }`,
+    `    const first = text.split(' ')[0];`,
+    `    for (const { matcher, handler } of handlers.command) {`,
+    `      if (first === matcher) {`,
+    `        await handler({ chatId, text, args: text.split(' ').slice(1) });`,
+    `        return;`,
+    `      }`,
+    `    }`,
+    `  };`,
+    `  const onCallback = async (data, message) => {`,
+    `    for (const { matcher, handler } of handlers.callback) {`,
+    `      if (data === matcher) {`,
+    `        await handler({ data, message, chatId: message.chat.id });`,
+    `        return;`,
+    `      }`,
+    `    }`,
+    `  };`,
+    `  return {`,
+    `    start: async () => {`,
+    `      while (true) {`,
+    `        let updates;`,
+    `        try {`,
+    `          updates = await call('getUpdates', { offset, timeout: 30 });`,
+    `        } catch (error) {`,
+    `          await sleep(3000);`,
+    `          continue;`,
+    `        }`,
+    `        for (const update of updates) {`,
+    `          offset = update.update_id + 1;`,
+    `          const chat = (update.message || update.callback_query || {}).chat;`,
+    `          if (chat) chats.set(chat.id, chat);`,
+    `          if (update.message && update.message.text != null) {`,
+    `            await onText(update.message.chat.id, update.message.text);`,
+    `          } else if (update.callback_query && update.callback_query.data != null) {`,
+    `            await onCallback(update.callback_query.data, update.callback_query.message);`,
+    `          }`,
+    `        }`,
+    `      }`,
+    `    },`,
+    `    onCommand: (matcher, handler) => handlers.command.push({ matcher, handler }),`,
+    `    onPattern: (matcher, handler) => handlers.pattern.push({ matcher, handler }),`,
+    `    onCallback: (matcher, handler) => handlers.callback.push({ matcher, handler }),`,
+    `  };`,
+    `}`,
+  ].join('\n'),
 };
 
 // Built-in stdlib functions: Plain name → JS code generator.
@@ -69,11 +179,40 @@ const STDLIB = {
   env:        (args, context) => `process.env[${generateExpr(args[0], context)}]`,
   exit:       (args, context) => `process.exit(${args.length ? generateExpr(args[0], context) : '0'})`,
   uuid:       (_args, context) => `crypto.randomUUID()`,
+  // v1.2 — Telegram runtime helpers
+  bot:         (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    if (!context.inFunction) context.needsAsync = true;
+    return `BOT = await createTelegramBot(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  sendMessage: (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    return `Telegram.sendMessage(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  sendPhoto:   (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    return `Telegram.sendPhoto(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
+  getChat:     (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    return `Telegram.getChat(${generateExpr(args[0], context)})`;
+  },
+  getMyChats:  (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    return `Telegram.getMyChats()`;
+  },
+  editMessage: (args, context) => {
+    ensureBuiltin(context, 'telegram');
+    return `Telegram.editMessage(${args.map(arg => generateExpr(arg, context)).join(', ')})`;
+  },
 };
 
 // Set to true while generating inside a route handler body.
 // Remaps Plain's "request" → "req" and "response" → "res".
 let _inRoute = false;
+// True while generating inside a Telegram handler body. Remaps Plain's
+// "reply" statement to send a chat message instead of an HTTP response.
+let _inTelegram = false;
 
 function createGenerationContext() {
   return {
@@ -208,13 +347,17 @@ function generateStatement(node, indent = '', context = createGenerationContext(
       try {
         new vm.Script(`(async () => {\n${node.body}\n})`);
       } catch (e) {
+        const label = node.name ? `assigned to "${node.name}"` : 'block';
         throw new Error(
-          `JavaScript error inside the "javascript" block assigned to "${node.name}": ${e.message}`
+          `JavaScript error inside the "javascript" ${label}: ${e.message}`
         );
       }
       // The body is emitted verbatim: JavaScript indentation, template
       // literals, and line structure are preserved as written (RFC-0011 §31).
-      return `${indent}let ${node.name} = await (async () => {\n${node.body}\n${indent}})();`;
+      if (node.name) {
+        return `${indent}let ${node.name} = await (async () => {\n${node.body}\n${indent}})();`;
+      }
+      return `${indent}await (async () => {\n${node.body}\n${indent}})();`;
     }
 
     // ask name  /  ask "<prompt>" as name
@@ -274,13 +417,25 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     }
 
     case 'ReplyStatement':
+      if (_inTelegram) {
+        return `${indent}await Telegram.sendMessage(ctx.chatId, ${generateExpr(node.value, context)});`;
+      }
       return `${indent}res.send(${generateExpr(node.value, context)});`;
 
     case 'ReplyJsonStatement': {
       const props = node.properties
         .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
         .join(', ');
+      if (_inTelegram) {
+        return `${indent}await Telegram.sendMessage(ctx.chatId, JSON.stringify({ ${props} }));`;
+      }
       return `${indent}res.json({ ${props} });`;
+    }
+
+    // v1.2 — reply <value> with buttons … done (Telegram inline keyboard).
+    case 'ReplyWithButtonsStatement': {
+      ensureBuiltin(context, 'telegram');
+      return `${indent}await Telegram.sendMessage(ctx.chatId, ${generateExpr(node.value, context)}, ${JSON.stringify(node.buttons)});`;
     }
 
     case 'ServeFolderStatement':
@@ -322,6 +477,35 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     case 'ExecuteStatement':
       return `${indent}db.exec(\`${node.sql}\`);`;
 
+    // v1.2 — Telegram statements
+
+    case 'TelegramCommandStatement': {
+      ensureBuiltin(context, 'telegram');
+      if (!context.inFunction) context.needsAsync = true;
+      _inTelegram = true;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      _inTelegram = false;
+      if (node.isPattern) {
+        return `${indent}BOT.onPattern(new RegExp(${JSON.stringify(node.command)}, 'i'), async (ctx) => {\n${body}\n${indent}});`;
+      }
+      return `${indent}BOT.onCommand(${JSON.stringify(node.command)}, async (ctx) => {\n${body}\n${indent}});`;
+    }
+
+    case 'TelegramCallbackStatement': {
+      ensureBuiltin(context, 'telegram');
+      if (!context.inFunction) context.needsAsync = true;
+      _inTelegram = true;
+      const body = node.body.map(s => generateStatement(s, indent + '  ', context)).join('\n');
+      _inTelegram = false;
+      return `${indent}BOT.onCallback(${JSON.stringify(node.data)}, async (ctx) => {\n${body}\n${indent}});`;
+    }
+
+    case 'TelegramStartStatement': {
+      ensureBuiltin(context, 'telegram');
+      if (!context.inFunction) context.needsAsync = true;
+      return `${indent}await BOT.start();`;
+    }
+
     default:
       throw new Error(`Unknown statement type "${node.type}".`);
   }
@@ -357,6 +541,14 @@ function generateExpr(node, context = createGenerationContext()) {
       return `[${node.elements.map(element => generateExpr(element, context)).join(', ')}]`;
 
     case 'ObjectLiteral': {
+      const props = node.properties
+        .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
+        .join(', ');
+      return `{ ${props} }`;
+    }
+
+    // v1.2 — Inline object literal: { key: value, ... }
+    case 'InlineObjectLiteral': {
       const props = node.properties
         .map(p => `${JSON.stringify(p.key)}: ${generateExpr(p.value, context)}`)
         .join(', ');

@@ -23,6 +23,8 @@ const KEYWORDS = new Set([
   // web (Express)
   'when', 'someone', 'visits', 'listen', 'on', 'reply', 'json', 'serve',
   'folder', 'web', 'route', 'start',
+  // v1.2 Telegram
+  'sends', 'clicks', 'matching',
   // database (SQLite)
   'database', 'query', 'insert', 'update', 'delete', 'execute',
   // v1.1.1 gateway
@@ -66,6 +68,8 @@ const STDLIB_FUNCTIONS = new Set([
   'length', 'uppercase', 'lowercase', 'random', 'round', 'sqlite',
   'print', 'readFile', 'writeFile', 'fileExists', 'read', 'write',
   'sleep', 'time', 'date', 'jsonEncode', 'jsonDecode', 'env', 'exit', 'uuid',
+  // v1.2 Telegram
+  'bot', 'sendMessage', 'sendPhoto', 'getChat', 'getMyChats', 'editMessage',
 ]);
 
 // JavaScript keywords used inside `javascript ... done` gateway blocks.
@@ -145,9 +149,15 @@ function token(stream, state) {
   if (stream.eat('[')) return 'punctuation';
   if (stream.eat(']')) return 'punctuation';
   if (stream.eat(',')) return 'punctuation';
+  // v1.2 — inline object literals and button arrows.
+  if (stream.eat('{')) return 'punctuation';
+  if (stream.eat('}')) return 'punctuation';
+  if (stream.eat(':')) return 'punctuation';
 
-  // Operators: `.` accessor and `+` arithmetic (the only ones the compiler
-  // tokenizes; `-`, `*`, `/`, `%` are NOT Plain and fall through to invalid).
+  // Operators: `.` accessor, `+` arithmetic and `->` button arrow (the only
+  // ones the compiler tokenizes; `-`, `*`, `/`, `%` are NOT Plain and fall
+  // through to invalid).
+  if (stream.match('->')) return 'operator';
   if (stream.eat('.')) return 'operator';
   if (stream.eat('+')) return 'operator';
 
@@ -159,7 +169,7 @@ function token(stream, state) {
     if (KEYWORDS.has(word)) {
       if (word === 'use') state.afterUse = true;
       if (word === 'web') state.afterWeb = true;
-      if (word === 'visits' || word === 'route') state.pendingRoute = true;
+      if (word === 'visits' || word === 'route' || word === 'sends' || word === 'clicks') state.pendingRoute = true;
       // `javascript` begins a gateway block when the rest of the line is
       // blank (the only form the compiler collects — fixture gateway_js.pln).
       if (word === 'javascript' && stream.match(/[ \t]*$/)) state.inJavaScript = true;
