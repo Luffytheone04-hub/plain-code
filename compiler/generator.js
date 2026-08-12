@@ -68,7 +68,7 @@ const BUILTIN_DECLARATIONS = {
     `  const handlers = { command: [], pattern: [], callback: [] };`,
     `  const keyboard = (rows) => ({`,
     `    reply_markup: {`,
-    `      inline_keyboard: rows.map((row) => row.map(([text, data]) => ({ text, callback_data: data }))),`,
+    `      inline_keyboard: [rows.map(([text, data]) => ({ text, callback_data: data }))],`,
     `    },`,
     `  });`,
     `  return {`,
@@ -339,9 +339,9 @@ function generateStatement(node, indent = '', context = createGenerationContext(
 
     // v1.1.1 — JavaScript Gateway (RFC-0011)
 
-    // remember <name> as javascript … done
+    // remember <name> as javascript … done   (named — always produces a value)
+    // javascript … done                      (statement-level block)
     case 'JavaScriptBlock': {
-      if (!context.inFunction) context.needsAsync = true;
       // Validate the raw JavaScript at compile time so JS syntax errors are
       // reported as such, with the Plain context that produced them.
       try {
@@ -352,12 +352,30 @@ function generateStatement(node, indent = '', context = createGenerationContext(
           `JavaScript error inside the "javascript" ${label}: ${e.message}`
         );
       }
-      // The body is emitted verbatim: JavaScript indentation, template
-      // literals, and line structure are preserved as written (RFC-0011 §31).
+      // Does the body use top-level `await`? Top-level await only parses
+      // inside an async function, so a plain Script rejects it. Synchronous
+      // statement-level blocks need no wrapper; async ones do.
+      let hasTopLevelAwait = false;
+      try {
+        new vm.Script(node.body);
+      } catch (_) {
+        hasTopLevelAwait = true;
+      }
+      // Named blocks always bind a value, so they keep the async IIFE. The
+      // body is emitted verbatim: JavaScript indentation, template literals,
+      // and line structure are preserved as written (RFC-0011 §31).
       if (node.name) {
+        if (!context.inFunction) context.needsAsync = true;
         return `${indent}let ${node.name} = await (async () => {\n${node.body}\n${indent}})();`;
       }
-      return `${indent}await (async () => {\n${node.body}\n${indent}})();`;
+      // Statement-level blocks inside functions/routes/loops, or that need
+      // top-level await, retain the async-context wrapper.
+      if (context.inFunction || hasTopLevelAwait) {
+        if (!context.inFunction) context.needsAsync = true;
+        return `${indent}await (async () => {\n${node.body}\n${indent}})();`;
+      }
+      // Synchronous statement-level block: emit its body directly/verbatim.
+      return `${indent}${node.body}`;
     }
 
     // ask name  /  ask "<prompt>" as name
@@ -433,9 +451,13 @@ function generateStatement(node, indent = '', context = createGenerationContext(
     }
 
     // v1.2 — reply <value> with buttons … done (Telegram inline keyboard).
+    // The AST stores rows of { text, data } objects (parser.js). The Telegram
+    // runtime's keyboard() expects a flat list of [text, data] pairs, so each
+    // button is rendered as [text, data] and rows are merged into that list.
     case 'ReplyWithButtonsStatement': {
       ensureBuiltin(context, 'telegram');
-      return `${indent}await Telegram.sendMessage(ctx.chatId, ${generateExpr(node.value, context)}, ${JSON.stringify(node.buttons)});`;
+      const pairs = node.buttons.flat().map(({ text, data }) => [text, data]);
+      return `${indent}await Telegram.sendMessage(ctx.chatId, ${generateExpr(node.value, context)}, ${JSON.stringify(pairs)});`;
     }
 
     case 'ServeFolderStatement':

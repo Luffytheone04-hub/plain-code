@@ -1,0 +1,28 @@
+{
+  "name": "fetch",
+  "category": "http",
+  "version": 1,
+  "title": "HTTP Fetch",
+  "purpose": "HTTP requests (GET/POST/PUT/PATCH/DELETE) with headers, JSON bodies, JSON responses, status checks, and error handling via fetch.",
+  "keywords": [
+    "http",
+    "fetch",
+    "request",
+    "response",
+    "headers",
+    "json",
+    "api",
+    "status"
+  ],
+  "triggers": [
+    { "type": "regex", "pattern": "\\bfetch\\b" },
+    { "type": "regex", "pattern": "\\brequest\\b" },
+    { "type": "regex", "pattern": "response is ok" },
+    { "type": "regex", "pattern": "response is not ok" }
+  ],
+  "dependencies": [],
+  "imports": [],
+  "async": true,
+  "compilerMin": "2.0.0",
+  "resolvablePaths": ["http/fetch", "http/fetch.json"]
+}

@@ -4,6 +4,69 @@ All notable changes to Plain are documented here.
 
 ---
 
+## [2.0.0] — 2026
+
+### AI-Assisted Compilation (RFC-0020)
+
+Plain gains an AI-assisted compilation layer **without replacing the existing
+deterministic compiler**. The deterministic compiler stays authoritative;
+versioned rules and an AI provider translate supported constructs that the
+compiler does not yet understand into validated JavaScript that flows through
+the normal bundler/runtime path.
+
+**Rule system** (`compiler/rules/`)
+- Versioned rule pairs (Markdown + JSON metadata) for Telegram bots, HTTP
+  fetch, and REST APIs
+- Rule metadata: name, category, version, keywords, triggers, dependencies,
+  async, compilerMin — used for deterministic matching and cache keys
+- Rule authoring guide in `compiler/rules/README.md`
+
+**AI layer** (`compiler/ai/`)
+- `resolver.js` — deterministic rule matching (RFC-0020 §8, §37)
+- `translator.js` — rule → cache → provider → validation orchestration
+- `agent.js` — provider-facing `translate()` interface (RFC-0020 §10)
+- `client.js` — OpenAI-compatible chat completions client, Agent Router +
+  Claude Opus defaults, environment-based configuration only
+- `prompt.js` — strict compile prompt contract (RFC-0020 §11)
+- `validator.js` — structure/field checks, `vm.Script` syntax check, forbidden
+  patterns, `require()` allowlist (RFC-0020 §13)
+- `cache.js` — local translation cache keyed by rule version + compiler
+  version + model + normalized source (RFC-0020 §15)
+
+**CLI**
+- Deterministic-first compile path with AI fallback (`compile()` in `cli.js`)
+- New commands: `plain ai status`, `plain ai rules`, `plain ai cache [clear]`
+- `plain doctor` reports the AI layer
+- `plain` exposed as a CLI executable alongside `plain-code`
+- Layer-specific diagnostics (RFC-0020 §39): Plain rule error, AI compilation
+  error, generated JavaScript validation error
+
+**Configuration & security**
+- `.env.example` added (`PLAIN_AI_API_KEY`, `PLAIN_AI_BASE_URL`,
+  `PLAIN_AI_MODEL`, optional `PLAIN_AI_CACHE_DIR`)
+- `.gitignore` added (`.env`, AI cache, build output)
+- Secrets are never hard-coded or sent to the provider (RFC-0020 §16, §44)
+
+### Language — Telegram (v1.2 deterministic syntax)
+
+- `remember bot as telegram bot with token` — create a polling Telegram bot
+- `when someone sends "/start"` — command handlers; `when someone clicks`
+  — callback handlers
+- `reply "..." with buttons … done` — inline keyboards
+- `sendMessage`, `sendPhoto`, `getChat`, `getMyChats`, `editMessage` stdlib
+- `start telegram bot` — begin polling
+- Inline `{ key: value }` object literals
+- Statement-level `javascript` blocks
+- `tests/telegram.test.js` added
+
+### Documentation
+
+- README updated for 2.0.0 (AI compilation, rules, Telegram, configuration)
+- `docs/AI_COMPILATION.md` added
+- `compiler/version.js` centralizes the version constant
+
+---
+
 ## [1.1.0] — 2026
 
 ### Language — Plain Expressions (RFC-0010)

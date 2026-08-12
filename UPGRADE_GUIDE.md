@@ -1,4 +1,68 @@
-# Upgrade Guide — v0.6 → v1.0.0
+# Upgrade Guide — v1.1 → v2.0.0
+
+## Overview
+
+Plain 2.0.0 adds an AI-assisted compilation layer (RFC-0020) on top of the
+existing deterministic compiler. **No Plain language syntax was removed or
+changed.**
+
+All programs written for v1.0/v1.1 continue to compile and run without
+modification.
+
+---
+
+## Step 1 — Update the compiler
+
+```bash
+npm install -g @ayoxx/plain-code
+```
+
+Verify the version:
+
+```bash
+plain version
+# Plain v2.0.0-beta
+```
+
+---
+
+## Step 2 — Optional: configure the AI provider
+
+The AI layer is used only when the deterministic compiler cannot compile a
+supported construct and a matching rule exists. Deterministic programs need no
+configuration.
+
+To enable AI-assisted compilation, copy `.env.example` to `.env` and set:
+
+```bash
+PLAIN_AI_API_KEY=...
+PLAIN_AI_BASE_URL=https://agentrouter.org
+PLAIN_AI_MODEL=claude-opus-4-6
+```
+
+Check the layer with `plain ai status`.
+
+---
+
+## Step 3 — What changed
+
+- The `plain` command is now exposed alongside `plain-code`.
+- `compile()` is now deterministic-first with an AI fallback; command output is
+  unchanged for deterministic programs.
+- New diagnostics commands: `plain ai status`, `plain ai rules`,
+  `plain ai cache [clear]`.
+- `plain doctor` additionally reports the AI layer.
+
+---
+
+## Breaking changes
+
+None. Existing Plain syntax, the JavaScript Gateway, and the dependency system
+are unchanged.
+
+---
+
+# Previous guide — v0.6 → v1.0.0
 
 ## Overview
 

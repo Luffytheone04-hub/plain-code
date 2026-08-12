@@ -1,0 +1,21 @@
+# Render blueprint for the hosted Plain AI compiler service.
+#
+# Deploy this repository to Render as a web service, then set the
+# PLAIN_AI_API_KEY environment variable in the Render dashboard (it is never
+# stored in the repository or in generated JavaScript).
+
+services:
+  - type: web
+    name: plain-code-compiler
+    runtime: node
+    plan: free
+    healthCheckPath: /health
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    envVars:
+      - key: PLAIN_AI_API_KEY
+        sync: false
+      - key: PLAIN_AI_BASE_URL
+        value: https://agentrouter.org
+      - key: PLAIN_AI_MODEL
+        value: claude-opus-4-6

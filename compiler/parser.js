@@ -7,7 +7,7 @@ const STATEMENT_KEYWORDS = [
   'remember', 'show', 'if', 'make', 'give',
   'for', 'while', 'use', 'import', 'when', 'listen', 'reply', 'serve',
   'web', 'route', 'start', 'database', 'query', 'insert', 'update', 'delete', 'execute',
-  'ask', 'javascript',
+  'ask', 'javascript', 'bot',
 ];
 
 // Number words used by the numbered item expression (v1.1):
@@ -223,6 +223,16 @@ function parse(tokens) {
 
     // Statements starting with an identifier: call, becomes, index/member becomes
     if (token.type === TOKEN.IDENTIFIER) {
+      // v1.2 — bot "<token>" / bot <expr>: creates the polling Telegram bot.
+      // Bound to BOT by the generator's `bot` stdlib. Only intercepts when a
+      // value follows; bot(...) calls and ordinary identifiers (e.g. a
+      // variable named bot) keep their normal meaning.
+      const nextIsValue =
+        peekAt(1).type === TOKEN.STRING  || peekAt(1).type === TOKEN.NUMBER ||
+        peekAt(1).type === TOKEN.IDENTIFIER ||
+        peekAt(1).type === TOKEN.LBRACKET || peekAt(1).type === TOKEN.LBRACE;
+      if (token.value === 'bot' && nextIsValue) return parseBot();
+
       const expr = parsePrimary();
 
       if (peek().type === TOKEN.BECOMES) {
@@ -581,6 +591,16 @@ function parse(tokens) {
       'Expected a route path after "route".\n\nExample:\n  route "/"\n    reply "Hello"\n  done').value;
     const body = parseBody('route');
     return { type: 'SimpleRouteStatement', path: routePath, body };
+  }
+
+  // bot "<token>"  /  bot env("BOT_TOKEN")
+  // Creates the polling Telegram bot and binds it to BOT (v1.2). The token
+  // argument may be any expression — the token literal is never required to
+  // appear in source, and the runtime falls back to TELEGRAM_BOT_TOKEN.
+  function parseBot() {
+    advance(); // consume "bot"
+    const token = parseExpression();
+    return { type: 'ExpressionStatement', expression: { type: 'CallExpression', name: 'bot', args: [token] } };
   }
 
   // start <port>

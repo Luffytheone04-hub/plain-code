@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to publish (e.g. 0.2.0)"
+        description: "Version to publish (e.g. 2.0)"
         required: true
-        default: "0.2.0"
+        default: "2.0.0"
 
 jobs:
   publish:
@@ -52,7 +52,7 @@ jobs:
 
       - name: Commit version bump (if changed)
         run: |
-          git config user.name "github-actions"
+          git config user.name "ayoistootuff"
           git config user.email "github-actions@github.com"
 
           git add package.json package-lock.json

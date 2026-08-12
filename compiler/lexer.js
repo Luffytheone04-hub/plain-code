@@ -64,6 +64,10 @@ const TOKEN = {
   ASK:           'ASK',           // interactive input: ask name / ask "prompt" as name
   PACKAGE:       'PACKAGE',       // bare npm package name after "use" (may contain -, _, ., /, @)
   // Punctuation
+  LBRACE:      'LBRACE',   // { — inline object literal (v1.2)
+  RBRACE:      'RBRACE',   // }
+  COLON:       'COLON',    // : — inline object property separator (v1.2)
+  ARROW:       'ARROW',    // -> — Telegram inline keyboard button (v1.2)
   LPAREN:      'LPAREN',
   RPAREN:      'RPAREN',
   LBRACKET:    'LBRACKET',

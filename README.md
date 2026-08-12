@@ -5,7 +5,7 @@
 
 Plain is an Intent-Oriented Programming Language (IOPL). You describe **what** you want; the compiler decides **how** to implement it in JavaScript.
 
-**Current version:** v1.1.1-beta — Plain Expressions (v1.1) and the JavaScript Gateway (v1.1.1).
+**Current version:** v2.0.0-beta — AI-Assisted Compilation (RFC-0020).
 
 ---
 
@@ -36,6 +36,9 @@ plain doctor             Check the Plain project environment
 plain add    <package>   Install a package and add it to plain.json
 plain remove <package>   Remove a package from plain.json and uninstall it
 plain update             Update all installed npm packages
+plain ai status          Show the AI compilation layer status
+plain ai rules           List the installed Plain rules
+plain ai cache           List / clear the local AI translation cache
 plain version            Print the compiler version
 plain help               Print help text
 ```
@@ -207,6 +210,143 @@ use @scope/package-name
 Names that are not valid JavaScript identifiers (like `node-fetch` or
 `@scope/package-name`) compile to a bare `require('...');`; simple names like
 `axios` still become `const axios = require('axios');`.
+
+AI-Assisted Compilation (v2.0)
+
+Plain 2.0.0 keeps the deterministic compiler authoritative and adds an
+**AI-assisted compilation layer** for capabilities that are not yet hard-coded
+into the compiler. This is a compiler extension, not a chatbot and not a
+replacement for the deterministic path (RFC-0020).
+
+How it works
+
+```text
+app.pln
+   │
+   ▼
+Existing Plain Lexer/Parser
+   │
+   deterministic support?
+   │          │
+   yes        no
+   │          ▼
+   ▼      Rule resolver
+Existing     │
+compiler     ▼
+        AI translation
+             │
+             ▼
+        validated JS/IR
+             │
+             ▼
+   Existing generator/bundler/runtime
+             │
+             ▼
+        executable JS
+```
+
+1. The deterministic compiler compiles everything it understands — always,
+   first, offline, for free.
+2. When it cannot compile a construct, the **rule resolver** matches the source
+   against versioned rule files in `compiler/rules/`.
+3. If a rule matches, a translation step turns the Plain construct into
+   JavaScript following that rule exactly. Plain ships with a **hosted compiler
+   service** (`https://plain-code-compiler.onrender.com`) that performs this
+   step for you, so most users need no configuration or API key.
+4. The generated JavaScript is **validated** (syntax check, forbidden patterns,
+   require() allowlist) — locally as well as on the service — and flows
+   through the normal bundler/runtime and dependency system.
+5. Successful translations are cached locally; a cached result from an older
+   rule version is never silently reused.
+
+Rules
+
+Each rule is a versioned pair: a human-readable Markdown file (syntax, meaning,
+JavaScript target, examples, security notes) and machine-readable JSON metadata
+(name, category, version, keywords, triggers, dependencies) used for
+deterministic matching and cache keys.
+
+Shipped rules: Telegram bots (`bots/telegram`), HTTP fetch (`http/fetch`), and
+REST APIs (`web/rest-api`).
+
+Telegram example
+
+```plain
+remember token as env("BOT_TOKEN")
+
+remember bot as telegram bot with token
+
+when someone sends "/start"
+  reply "Hello from Plain!"
+done
+```
+
+HTTP example
+
+```plain
+remember response as await fetch "https://facts.com"
+
+if response is ok
+  remember data as response.json()
+  show data
+otherwise
+  show "api failed"
+done
+```
+
+Configuration
+
+**Plain users do not need an API key.** By default, unsupported Plain syntax is
+sent to the hosted compiler service at `https://plain-code-compiler.onrender.com`,
+which owns the provider credential. There is nothing to configure:
+
+```bash
+plain ai status     # shows the active AI path (hosted service by default)
+```
+
+To point Plain at a different hosted deployment, override the endpoint:
+
+```bash
+export PLAIN_AI_REMOTE_URL=https://plain-code-compiler.onrender.com
+```
+
+Self-hosting the provider (running your own service or calling a provider
+directly) is optional and environment-based only. No secrets live in the
+repository — see `.env.example`:
+
+```bash
+export PLAIN_AI_API_KEY=...
+export PLAIN_AI_BASE_URL=https://agentrouter.org
+export PLAIN_AI_MODEL=claude-opus-4-6
+```
+
+- Deterministic programs compile fine with no configuration.
+- The AI layer is used only when the deterministic compiler cannot compile the
+  source and a rule matches.
+- Tokens, keys, and secret values are never sent to the provider — only the
+  Plain source and the matching rule. The hosted service never returns, logs,
+  or embeds the provider key in generated JavaScript.
+
+Diagnostics
+
+```bash
+plain ai status     # provider, rules, cache
+plain ai rules      # list rules
+plain ai cache      # list cached translations
+plain ai cache clear
+```
+
+When AI compilation fails, the error identifies the failing layer (Plain syntax
+error, Plain rule error, AI compilation error, generated JavaScript validation
+error, runtime dependency error).
+
+Privacy and security
+
+- AI-generated code is validated before it can run.
+- Only relevant source and the matching rule are sent — never the whole project.
+- The real `.env` is ignored by `.gitignore`; only `.env.example` is committed.
+- The JavaScript Gateway remains the explicit escape hatch for advanced or
+  unsupported JavaScript.
 
 Runtime Standard Library (v0.6)
 
@@ -475,6 +615,34 @@ Running the tests
 npm test
 ```
 
+Runs the main compiler suite (`tests/compiler.test.js`), the Telegram suite
+(`tests/telegram.test.js`), and the AI layer suite (`tests/ai.test.js`). The AI
+suite uses a mocked provider — it never needs a real API key or network access.
+It also starts the AI service (`compiler/ai/server.js`) on an ephemeral port
+and exercises the HTTP translate/health path against the shared pipeline.
+
+Hosted compiler service
+
+The repository ships with a minimal, deployable HTTP service
+(`compiler/ai/server.js`) that serves the AI compilation pipeline over HTTP, so
+the hosted deployment and the CLI share one implementation. Start it locally:
+
+```bash
+npm start          # or: node compiler/ai/server.js
+```
+
+It listens on `$PORT` (Render provides this) or `3000`:
+
+- `GET  /health` — health check (`{ ok: true, service, version }`)
+- `POST /translate` — `{ "source": "...", "rule": "bots/telegram"?, "options": { "noCache": true }? }`
+  returns the same validated output contract the CLI consumes.
+
+Deploy on Render with `render.yaml` (web service, `npm start`). Set
+`PLAIN_AI_API_KEY` as a secret in the Render dashboard — it is read from the
+environment at runtime and is never committed, logged, or embedded in
+generated JavaScript. `plain-code-compiler.onrender.com` is the public
+instance; the CLI reaches it via `compiler/ai/remote.js`.
+
 ---
 
 Project structure
@@ -488,6 +656,23 @@ Plain/
 │   ├── bundler.js            — resolves imports and bundles files
 │   ├── formatter.js          — normalises Plain source style
 │   ├── dependency-detector.js— detects npm packages from source
+│   ├── version.js            — single compiler version constant
+│   ├── ai/                   — AI-assisted compilation layer (RFC-0020)
+│   │   ├── resolver.js       — deterministic rule matching
+│   │   ├── translator.js     — rule → cache → provider → validation
+│   │   ├── validator.js      — AI output validation
+│   │   ├── agent.js          — provider-facing translate() interface
+│   │   ├── client.js         — OpenAI-compatible HTTP client
+│   │   ├── prompt.js         — strict compile prompt builder
+│   │   ├── cache.js          — local translation cache
+│   │   ├── remote.js         — hosted service client (plain-code-compiler.onrender.com)
+│   │   ├── server.js         — hosted AI compiler HTTP service
+│   │   └── index.js          — public AI API + diagnostics
+│   ├── rules/                — versioned capability rules
+│   │   ├── README.md         — rule authoring guide
+│   │   ├── bots/telegram.*   — Telegram bot rule
+│   │   ├── http/fetch.*      — HTTP fetch rule
+│   │   └── web/rest-api.*    — REST API rule
 │   └── cli.js                — command-line entry point
 │
 ├── examples/
@@ -506,11 +691,16 @@ Plain/
 │   └── deployment.pln — runtime dependency detection and deployment
 │
 ├── tests/
-│   └── compiler.test.js
+│   ├── compiler.test.js
+│   ├── telegram.test.js
+│   └── ai.test.js
 │
 ├── docs/
-│   └── PLAIN_SPEC.md  — language specification (v0.3)
+│   ├── PLAIN_SPEC.md  — language specification
+│   └── AI_COMPILATION.md — AI-assisted compilation guide
 │
+├── .env.example       — AI provider configuration template (never a real .env)
+├── render.yaml        — Render blueprint for the hosted AI compiler service
 ├── package.json
 └── README.md
 ```

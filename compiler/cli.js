@@ -12,6 +12,9 @@
 //   plain add    <package>   install a package and add it to plain.json
 //   plain remove <package>   uninstall a package and remove it from plain.json
 //   plain update             update all installed packages
+//   plain ai     status      show the AI compilation layer status
+//   plain ai     rules       list the installed Plain rules
+//   plain ai     cache       list / clear the local AI translation cache
 //   plain version            print the compiler version
 //   plain help               print this help text
 
@@ -24,8 +27,9 @@ const { generate, createGenerationContext, wrapAsync } = require('./generator');
 const { bundle, resolveDependencies } = require('./bundler');
 const { format }   = require('./formatter');
 const { detectDependencies, PACKAGE_MAP, isBuiltinModule } = require('./dependency-detector');
+const ai = require('./ai');
 
-const VERSION = '1.1.1-beta';
+const { VERSION } = require('./version');
 
 // ── Terminal colours (disabled when stdout is not a TTY) ──────────────────────
 
@@ -59,8 +63,27 @@ Commands
   plain add    <package>   Install a package and add it to plain.json
   plain remove <package>   Remove a package from plain.json and uninstall it
   plain update             Update all installed npm packages
+  plain ai status          Show the AI compilation layer status
+  plain ai rules           List the installed Plain rules
+  plain ai cache           List the local AI translation cache
+  plain ai cache clear     Clear the local AI translation cache
   plain version            Print the compiler version
   plain help               Print this help text
+
+v2.0 AI-Assisted Compilation
+
+  The deterministic compiler stays authoritative. When it cannot compile a
+  valid Plain construct, versioned rules (compiler/rules/) and an AI provider
+  translate it into validated JavaScript that flows through the normal
+  bundler/runtime path (RFC-0020).
+
+  Plain ships with a hosted compiler service that owns the provider credential,
+  so unsupported syntax compiles at plain-code-compiler.onrender.com with no
+  setup and no API key. To self-host the provider instead, configure:
+
+  PLAIN_AI_API_KEY, PLAIN_AI_BASE_URL, PLAIN_AI_MODEL
+  Override the hosted endpoint with: PLAIN_AI_REMOTE_URL
+  Example:    plain ai status
 
 v1.0 Language Features
 
@@ -132,10 +155,27 @@ function writePlainJson(data) {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function stage(label, fn) {
+function stage(label, fn, fallback) {
   const t0 = Date.now();
   try {
     const result = fn();
+    const ms = Date.now() - t0;
+    console.log(`${clrGreen('✓')} ${label}${ms > 50 ? clrDim(` (${ms}ms)`) : ''}`);
+    return result;
+  } catch (err) {
+    // With `fallback` set, the caller handles the error (e.g. the AI layer
+    // takes over). Otherwise fail fast with a clear diagnostic.
+    if (fallback) throw err;
+    console.error(`${clrRed('✗')} ${label} failed\n`);
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
+async function stageAsync(label, fn) {
+  const t0 = Date.now();
+  try {
+    const result = await fn();
     const ms = Date.now() - t0;
     console.log(`${clrGreen('✓')} ${label}${ms > 50 ? clrDim(` (${ms}ms)`) : ''}`);
     return result;
@@ -219,31 +259,60 @@ function ensureDependencies(files, config, install = true) {
   throw new Error(`Missing dependencies:\n\n${lines.join('\n\n')}`);
 }
 
-function compile(filePath) {
-  let files;
-  stage('Resolving imports', () => {
-    files = resolveDependencies(path.resolve(filePath));
-  });
-  stage('Building dependency graph', () => files);
-  stage('Checking runtime dependencies', () => ensureDependencies(files, readPlainJson(), true));
+// Compile a Plain program to JavaScript.
+//
+// Deterministic first: the existing lexer/parser/generator pipeline compiles
+// everything it understands (RFC-0020 §14). When the deterministic path fails,
+// the AI layer kicks in — rule resolution, optional AI translation, validation —
+// and the result flows through the same bundler/runtime path (RFC-0020 §24).
+async function compile(filePath, options) {
+  const opts = options || {};
+  const absPath = path.resolve(filePath);
+  if (!fs.existsSync(absPath)) {
+    console.error(`File not found: ${filePath}`);
+    process.exit(1);
+  }
   const generationContext = createGenerationContext();
-  let js = stage('Generating JavaScript', () =>
-    files.map(({ ast }) => generate(ast, generationContext)).filter(s => s.trim()).join('\n')
-  );
-  // Wrap the whole program when it contains top-level await (JavaScript
-  // blocks or `ask`), so the generated code can legally await (RFC-0011 §10).
-  if (generationContext.needsAsync) js = wrapAsync(js);
-  return js;
+
+  // Deterministic attempt. stage(..., true) rethrows so the AI fallback below
+  // can take over instead of exiting the process.
+  try {
+    let files;
+    stage('Resolving imports', () => {
+      files = resolveDependencies(absPath);
+    }, true);
+    stage('Building dependency graph', () => files, true);
+    stage('Checking runtime dependencies', () => ensureDependencies(files, readPlainJson(), true), true);
+    const js = stage('Generating JavaScript', () =>
+      files.map(({ ast }) => generate(ast, generationContext)).filter(s => s.trim()).join('\n'), true);
+    return generationContext.needsAsync ? wrapAsync(js) : js;
+  } catch (err) {
+    console.log(clrYellow('·') + ` Deterministic compiler could not compile "${path.basename(absPath)}" — trying AI-assisted compilation.`);
+  }
+
+  // AI-assisted fallback (RFC-0020 §5, §17).
+  const compiled = await stageAsync('AI-assisted compilation', async () => {
+    const result = await ai.compileFile(absPath, opts);
+    const extra = (result.dependencies || []).filter(pkg => !isBuiltinModule(pkg));
+    if (extra.length) {
+      ensureDependencies([], { dependencies: Object.fromEntries(extra.map(p => [p, '*'])) }, true);
+    }
+    return result;
+  });
+
+  generationContext.needsAsync = generationContext.needsAsync || Boolean(compiled.async);
+  const js = compiled.javascript;
+  return generationContext.needsAsync ? wrapAsync(js) : js;
 }
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
-function cmdRun(filePath, extraArgs = []) {
+async function cmdRun(filePath, extraArgs = []) {
   if (!filePath) {
     console.error('Usage: plain run <file.pln>');
     process.exit(1);
   }
-  const js = compile(filePath);
+  const js = await compile(filePath);
   console.log('');
   // Execute the generated file from the entry file's directory so Node
   // resolves require(...) against the project's local node_modules instead
@@ -262,18 +331,18 @@ function cmdRun(filePath, extraArgs = []) {
   console.log('\nDone.');
 }
 
-function cmdBuild(filePath) {
+async function cmdBuild(filePath) {
   if (!filePath) {
     console.error('Usage: plain build <file.pln>');
     process.exit(1);
   }
-  const js = compile(filePath);
+  const js = await compile(filePath);
   const outPath = filePath.replace(/\.pln$/, '.js');
   fs.writeFileSync(path.resolve(outPath), js, 'utf8');
   console.log(`\nOutput written to ${outPath}`);
 }
 
-function cmdStart(extraArgs = []) {
+async function cmdStart(extraArgs = []) {
   const config = readPlainJson();
   if (!config) {
     console.error(`No ${PLAIN_JSON} found. Run "plain init" first.`);
@@ -284,7 +353,7 @@ function cmdStart(extraArgs = []) {
     console.error(`Entry file "${entry}" not found.`);
     process.exit(1);
   }
-  cmdRun(entry, extraArgs);
+  await cmdRun(entry, extraArgs);
 }
 
 function cmdNew(projectName) {
@@ -455,6 +524,15 @@ function cmdDoctor() {
   check('Formatter', fs.existsSync(path.join(__dirname, 'formatter.js')));
   check('Runtime', fs.existsSync(path.join(__dirname, 'generator.js')));
 
+  // AI-assisted compilation layer (RFC-0020)
+  const aiRulesDir = path.join(__dirname, 'rules');
+  const aiConfig   = ai.aiStatus();
+  check('AI rules', fs.existsSync(aiRulesDir), aiRulesDir);
+  check('AI provider', true,
+    aiConfig.enabled ? `${aiConfig.baseUrl} (${aiConfig.model})` : `hosted service — ${aiConfig.hosted}`);
+  check('AI cache', true, `${aiConfig.cacheEntries} entries`);
+  console.log('');
+
   const config = readPlainJson();
   check('Project configuration', Boolean(config), config ? 'plain.json found' : 'run plain init');
   if (!config) return;
@@ -615,31 +693,102 @@ function cmdHelp() {
   console.log(HELP);
 }
 
+// ── AI commands (RFC-0020 §19) ───────────────────────────────────────────────
+
+function cmdAiStatus() {
+  const s = ai.aiStatus();
+  const check = (label, ok, detail = '') => {
+    const suffix = detail ? ` — ${detail}` : '';
+    console.log(`${ok ? clrGreen('✓') : clrRed('✗')} ${label}${suffix}`);
+  };
+  console.log('Plain AI compilation\n');
+  check('AI path', true,
+    s.enabled ? `local provider — ${s.provider} (${s.model})` : `hosted service — ${s.hosted}`);
+  check('API key', s.enabled, s.enabled ? s.apiKey : 'owned by the hosted service');
+  check('Compiler', true, `v${s.compilerVersion}`);
+  check('Rules', s.ruleCount > 0, `${s.ruleCount} loaded`);
+  check('Cache', true, `${s.cacheEntries} entries (${s.cacheSizeBytes} bytes)`);
+}
+
+function cmdAiRules() {
+  const rules = ai.aiRules();
+  console.log(`Plain rules (${rules.length})\n`);
+  if (rules.length === 0) {
+    console.log('No rules found. Add .json + .md files under compiler/rules/.');
+    return;
+  }
+  for (const r of rules) {
+    const line = r.error
+      ? `  ${clrRed('✗')} ${r.file} — ${r.error}`
+      : `  ${clrGreen('✓')} ${r.id} v${r.version} — ${r.title}${r.async ? clrDim(' (async)') : ''}`;
+    console.log(line);
+    if (!r.error) {
+      console.log(clrDim(`       deps: ${(r.dependencies || []).join(', ') || 'none'}`));
+    }
+  }
+}
+
+function cmdAiCache(clearFlag) {
+  if (clearFlag) {
+    const { removed } = ai.aiClearCache();
+    console.log(`${clrGreen('✓')} Cleared ${removed} cached translation(s).`);
+    return;
+  }
+  const cache = ai.aiCache();
+  console.log(`AI translation cache (${cache.entries.length})\n`);
+  if (cache.entries.length === 0) {
+    console.log(`No cached translations in ${cache.dir}`);
+    return;
+  }
+  for (const e of cache.entries) {
+    console.log(`  ${e.key.slice(0, 16)}…  rule=${e.rule || '?'} v${e.ruleVersion || '?'}  model=${e.model || '?'}  ${clrDim(e.mtime)}`);
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-const [, , command, fileArg] = process.argv;
+async function main() {
+  const [, , command, fileArg] = process.argv;
 
-switch (command) {
-  case 'run':     cmdRun(fileArg, process.argv.slice(4)); break;
-  case 'build':   cmdBuild(fileArg);      break;
-  case 'check':   cmdCheck(fileArg);      break;
-  case 'fmt':     cmdFmt(fileArg);        break;
-  case 'new':     cmdNew(fileArg);        break;
-  case 'init':    cmdInit();              break;
-  case 'install': cmdInstall();           break;
-  case 'start':   cmdStart(process.argv.slice(3)); break;
-  case 'doctor':  cmdDoctor();            break;
-  case 'add':     cmdAdd(fileArg);        break;
-  case 'remove':  cmdRemove(fileArg);     break;
-  case 'update':  cmdUpdate();            break;
-  case 'version': cmdVersion();           break;
-  case 'help':    cmdHelp();              break;
-  default:
-    // Backwards-compatible: treat the first arg as a file to run directly
-    if (command && command.endsWith('.pln')) {
-      cmdRun(command);
-    } else {
-      console.error(`Unknown command: "${command}". Run "plain help" for usage.`);
-      process.exit(1);
-    }
+  switch (command) {
+    case 'run':     await cmdRun(fileArg, process.argv.slice(4)); break;
+    case 'build':   await cmdBuild(fileArg);      break;
+    case 'check':   cmdCheck(fileArg);            break;
+    case 'fmt':     cmdFmt(fileArg);              break;
+    case 'new':     cmdNew(fileArg);              break;
+    case 'init':    cmdInit();                    break;
+    case 'install': cmdInstall();                 break;
+    case 'start':   await cmdStart(process.argv.slice(3)); break;
+    case 'doctor':  cmdDoctor();                  break;
+    case 'add':     cmdAdd(fileArg);              break;
+    case 'remove':  cmdRemove(fileArg);           break;
+    case 'update':  cmdUpdate();                  break;
+    case 'version': cmdVersion();                 break;
+    case 'help':    cmdHelp();                    break;
+    case 'ai':
+      switch (fileArg) {
+        case 'status': cmdAiStatus(); break;
+        case 'rules':  cmdAiRules();  break;
+        case 'cache':
+          cmdAiCache(process.argv[4] === 'clear');
+          break;
+        default:
+          console.error('Usage: plain ai status|rules|cache [clear]');
+          process.exit(1);
+      }
+      break;
+    default:
+      // Backwards-compatible: treat the first arg as a file to run directly
+      if (command && command.endsWith('.pln')) {
+        await cmdRun(command);
+      } else {
+        console.error(`Unknown command: "${command}". Run "plain help" for usage.`);
+        process.exit(1);
+      }
+  }
 }
+
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

@@ -5,19 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Plain — The programming language that reads like English</title>
-  <meta name="description" content="Plain is an Intent-Oriented Programming Language (IOPL). Write programs in near-English sentences and compile them to JavaScript. v1.1.1-beta — Plain Expressions and the JavaScript Gateway.">
+  <meta name="description" content="Plain is an Intent-Oriented Programming Language (IOPL). Write programs in near-English sentences and compile them to JavaScript. v2.0.0-beta — AI-Assisted Compilation.">
   <meta name="keywords" content="Plain, IOPL, intent-oriented programming, programming language, JavaScript, Plain language, plain-code, beginner programming language">
   <link rel="canonical" href="https://github.com/ayoistooslick/plain-code">
 
   <meta property="og:type"        content="website">
   <meta property="og:url"         content="https://ayoistooslick.github.io/plain-code/">
   <meta property="og:title"       content="Plain — The programming language that reads like English">
-  <meta property="og:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.1.1-beta — Plain Expressions and the JavaScript Gateway.">
+  <meta property="og:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v2.0.0-beta — AI-Assisted Compilation.">
   <meta property="og:image"       content="https://ayoistooslick.github.io/plain-code/og.png">
 
   <meta name="twitter:card"        content="summary_large_image">
   <meta name="twitter:title"       content="Plain — The programming language that reads like English">
-  <meta name="twitter:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v1.1.1-beta Plain Expressions and the JavaScript Gateway.">
+  <meta name="twitter:description" content="Write programs in near-English sentences. Plain compiles to JavaScript. v2.0.0-beta AI-Assisted Compilation.">
   <meta name="twitter:image"       content="https://ayoistooslick.github.io/plain-code/og.png">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -29,13 +29,14 @@
   <div class="nav-inner">
     <a class="nav-logo" href="#top">
       <span class="logo-word">Plain</span>
-      <span class="logo-ver">v1.1.1-beta</span>
+      <span class="logo-ver">v2.0.0-beta</span>
     </a>
 
     <ul class="nav-links" role="list">
       <li><a href="#quickstart">Docs</a></li>
       <li><a href="#examples">Examples</a></li>
       <li><a href="#language">Language</a></li>
+      <li><a href="#ai">AI</a></li>
       <li><a href="#cli">CLI</a></li>
       <li><a href="#packages">Packages</a></li>
       <li><a href="#faq">FAQ</a></li>
@@ -61,6 +62,7 @@
   <a href="#quickstart">Docs</a>
   <a href="#examples">Examples</a>
   <a href="#language">Language</a>
+  <a href="#ai">AI</a>
   <a href="#stdlib">Standard Library</a>
   <a href="#web">Web Development</a>
   <a href="#database">SQLite</a>
@@ -81,7 +83,7 @@
       <div class="hero-copy">
         <div class="hero-badge">
           <i class="fa-solid fa-bolt"></i>
-          v1.1.1-beta &mdash; JavaScript Gateway
+          v2.0.0-beta &mdash; AI-Assisted Compilation
         </div>
         <h1 class="hero-title">
           The language<br>
@@ -847,6 +849,9 @@ require(<span class="str">'@scope/package-name'</span>);</code></pre>
         <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain start</span></div>
         <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain doctor</span></div>
         <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain update</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain ai status</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain ai rules</span></div>
+        <div class="cmd-strip"><span class="prm">$</span> <span class="cmd">plain ai cache</span></div>
 
         <h3 class="sub-heading" style="margin-top:1.5rem"><i class="fa-solid fa-file-code"></i> plain.json</h3>
         <div class="code-block">
@@ -892,6 +897,84 @@ require(<span class="str">'@scope/package-name'</span>);</code></pre>
             <p>Plain detects <code>use</code>, <code>web app</code>, and database dependencies. <code>plain install</code>, <code>plain run</code>, and <code>plain build</code> install only missing npm packages; built-in Node modules are never installed.</p>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- AI-ASSISTED COMPILATION (v2.0)                                            -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<section class="section" id="ai">
+  <div class="container">
+    <div class="section-tag"><i class="fa-solid fa-wand-magic-sparkles"></i> v2.0</div>
+    <h2 class="section-title">AI-Assisted Compilation</h2>
+    <p class="section-lead">
+      The deterministic compiler stays authoritative. When it cannot compile a
+      supported construct, versioned rules and an AI provider translate it into
+      validated JavaScript that flows through the normal bundler/runtime path.
+    </p>
+
+    <div class="compare" style="margin-bottom:2rem">
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">telegram.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> token <span class="kw">as</span> <span class="fn">env</span>(<span class="str">"BOT_TOKEN"</span>)
+
+<span class="kw">remember</span> bot <span class="kw">as</span> telegram bot with token
+
+<span class="kw">when someone sends</span> <span class="str">"/start"</span>
+    <span class="kw">reply</span> <span class="str">"Hello from Plain!"</span>
+<span class="kw">done</span></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-block-header">
+          <div class="code-block-dots"><span></span><span></span><span></span></div>
+          <span class="code-block-title">http.pln</span>
+          <button class="code-copy"><i class="fa-regular fa-copy"></i> Copy</button>
+        </div>
+        <pre><code><span class="kw">remember</span> response <span class="kw">as</span> <span class="kw">await</span> <span class="fn">fetch</span> <span class="str">"https://facts.com"</span>
+
+<span class="kw">if</span> response <span class="kw">is</span> ok
+    <span class="kw">remember</span> data <span class="kw">as</span> response.<span class="fn">json</span>()
+    <span class="kw">show</span> data
+<span class="kw">otherwise</span>
+    <span class="kw">show</span> <span class="str">"api failed"</span>
+<span class="kw">done</span></code></pre>
+      </div>
+    </div>
+
+    <div class="feature-grid" style="margin-bottom:2rem">
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-list-check"></i></div>
+        <h4>Rule system</h4>
+        <p>Versioned rule pairs (Markdown + JSON) for Telegram bots, HTTP fetch, and REST APIs live in <code>compiler/rules/</code> and ship with the package.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <h4>Validated output</h4>
+        <p>AI-generated JavaScript is syntax-checked and scanned for forbidden patterns and undeclared requires before it can run.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-vault"></i></div>
+        <h4>Secrets protected</h4>
+        <p>Configuration is environment-based (<code>PLAIN_AI_API_KEY</code>, <code>PLAIN_AI_BASE_URL</code>, <code>PLAIN_AI_MODEL</code>). Secret values are never sent to the provider.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-card-icon"><i class="fa-solid fa-memory"></i></div>
+        <h4>Local cache</h4>
+        <p>Successful translations are cached locally, keyed by rule version + compiler version + model + source. Stale rules are never reused.</p>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <i class="fa-solid fa-circle-info"></i>
+      <div class="callout-body">
+        <strong>Diagnostics</strong>
+        <p>Run <code>plain ai status</code>, <code>plain ai rules</code>, or <code>plain ai cache [clear]</code>. See <code>docs/AI_COMPILATION.md</code> for the full guide.</p>
       </div>
     </div>
   </div>
@@ -1243,7 +1326,8 @@ Plain v1.1.1-beta</code></pre>
     <div class="section-tag"><i class="fa-solid fa-map"></i> Roadmap</div>
     <h2 class="section-title">What&rsquo;s next</h2>
     <p class="section-lead">
-      Plain 1.0 is stable, v1.1 added Plain Expressions, and v1.1.1-beta is the JavaScript Gateway release. Here&rsquo;s what&rsquo;s planned for the versions that follow.
+      Plain 1.0 is stable, v1.1 added Plain Expressions, v1.1.1-beta brought the
+      JavaScript Gateway, and v2.0.0-beta adds AI-Assisted Compilation. Here&rsquo;s what&rsquo;s planned next.
     </p>
 
     <div class="roadmap">
@@ -1322,13 +1406,30 @@ Plain v1.1.1-beta</code></pre>
       <div class="roadmap-item">
         <div class="roadmap-version">v2.0</div>
         <div class="roadmap-line-wrap">
+          <div class="roadmap-dot done"></div>
+          <div class="roadmap-connector"></div>
+        </div>
+        <div class="roadmap-content">
+          <h4>v2.0 — AI-Assisted Compilation <span class="badge badge-green" style="margin-left:.5rem"><i class="fa-solid fa-check"></i> Released (beta)</span></h4>
+          <ul>
+            <li>Rule system — Telegram, HTTP fetch, REST APIs</li>
+            <li>AI translation layer with validated output</li>
+            <li>Deterministic compiler stays authoritative</li>
+            <li>Telegram bot language support</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="roadmap-item">
+        <div class="roadmap-version">v2.1</div>
+        <div class="roadmap-line-wrap">
           <div class="roadmap-dot"></div>
         </div>
         <div class="roadmap-content">
-          <h4>v2.0 — Extended Language <span class="badge badge-amber" style="margin-left:.5rem">Future</span></h4>
+          <h4>v2.1 — Extended Language <span class="badge badge-amber" style="margin-left:.5rem">Planned</span></h4>
           <ul>
             <li>Optional type hints (non-breaking)</li>
-            <li>Async operations</li>
+            <li>More async operations</li>
             <li>Standard library expansion</li>
             <li>Module system refinements</li>
           </ul>
@@ -1359,14 +1460,14 @@ Plain v1.1.1-beta</code></pre>
       <div class="faq-item">
         <button class="faq-question">Is Plain production-ready? <i class="fa-solid fa-chevron-down"></i></button>
         <div class="faq-answer">
-          Plain 1.1.1-beta includes runtime dependency detection, automatic installation, and deployment-oriented CLI commands. It compiles to standard Node.js-compatible JavaScript and remains well-suited for personal projects, tooling, and learning.
+          Plain 2.0.0-beta includes runtime dependency detection, automatic installation, an AI-assisted compilation layer, and deployment-oriented CLI commands. It compiles to standard Node.js-compatible JavaScript and remains well-suited for personal projects, tooling, and learning.
         </div>
       </div>
 
       <div class="faq-item">
         <button class="faq-question">Does Plain support TypeScript? <i class="fa-solid fa-chevron-down"></i></button>
         <div class="faq-answer">
-          Not yet. Plain compiles to plain JavaScript. Optional type hints are planned for v2.0, but they will be designed to stay readable in Plain's English-sentence style — not to mirror TypeScript syntax.
+          Not yet. Plain compiles to plain JavaScript. Optional type hints are planned for a future version, but they will be designed to stay readable in Plain's English-sentence style — not to mirror TypeScript syntax.
         </div>
       </div>
 
@@ -1534,7 +1635,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.</code></pre>
   <div class="footer-bottom">
     <p>Copyright &copy; 2026 Ayokunle. Released under the MIT License.</p>
     <span class="badge badge-blue version-badge">
-      <i class="fa-solid fa-bolt"></i> Plain v1.1.1-beta
+      <i class="fa-solid fa-bolt"></i> Plain v2.0.0-beta
     </span>
   </div>
 </footer>

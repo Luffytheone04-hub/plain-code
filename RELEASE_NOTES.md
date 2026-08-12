@@ -1,4 +1,91 @@
-# Plain v1.0.0 — Release Notes
+# Plain v2.0.0 — Release Notes
+
+**Release date:** 2026
+
+---
+
+## What is Plain 2.0.0?
+
+Plain 2.0.0 is an Intent-Oriented Programming Language (IOPL) with an
+**AI-assisted compilation layer**. The deterministic compiler remains
+authoritative: it compiles everything it understands, offline and for free.
+When it cannot compile a supported Plain construct, versioned rule files and an
+AI provider translate it into validated JavaScript that flows through the
+normal bundler/runtime path (RFC-0020).
+
+> An Intent-Oriented Programming Language with a deterministic compiler, a
+> growing rule system, and an AI-assisted translation layer for capabilities
+> that have not yet been hard-coded into the compiler.
+
+## What's in v2.0.0?
+
+### AI-assisted compilation (RFC-0020)
+
+- **Rule system** — versioned rule pairs (Markdown + JSON) for Telegram bots,
+  HTTP fetch, and REST APIs, shipped inside the package (`compiler/rules/`)
+- **AI layer** — rule resolver, translator, provider agent, OpenAI-compatible
+  client, strict prompt contract, and a validation gate (`compiler/ai/`)
+- **Deterministic first** — existing Plain syntax never calls the AI layer
+- **Caching** — successful translations cached locally; stale rule versions are
+  never reused
+- **Validation** — AI output is syntax-checked and scanned for forbidden
+  patterns and undeclared requires before it can run
+- **Environment-based configuration** — `PLAIN_AI_API_KEY`, `PLAIN_AI_BASE_URL`,
+  `PLAIN_AI_MODEL`; no secrets in the repository (`.env.example` provided)
+- **Diagnostics** — `plain ai status`, `plain ai rules`, `plain ai cache
+  [clear]`; layer-specific error messages
+- **`plain` CLI** — the `plain` executable is now exposed alongside
+  `plain-code`
+
+### Telegram language support (v1.2 deterministic syntax)
+
+```plain
+remember token as env("BOT_TOKEN")
+
+remember bot as telegram bot with token
+
+when someone sends "/start"
+  reply "Hello from Plain!"
+done
+```
+
+Including `when someone clicks`, `reply ... with buttons`, `sendMessage` /
+`sendPhoto` / `getChat` / `getMyChats` / `editMessage`, `start telegram bot`,
+inline `{ key: value }` objects, and statement-level `javascript` blocks.
+
+### Breaking changes
+
+- Version bumps to 2.0.0 (package.json, CLI, docs). No Plain language syntax
+  was removed or changed.
+
+---
+
+## Installation
+
+```bash
+npm install -g @ayoxx/plain-code
+```
+
+## AI configuration (optional)
+
+```bash
+export PLAIN_AI_API_KEY=...
+export PLAIN_AI_BASE_URL=https://agentrouter.org
+export PLAIN_AI_MODEL=claude-opus-4-6
+```
+
+Deterministic Plain programs compile without any configuration. The AI layer is
+used only when the deterministic compiler cannot compile the source and a rule
+matches.
+
+## Upgrade from v1.1
+
+See `UPGRADE_GUIDE.md`. Existing Plain programs and the JavaScript Gateway
+continue to work unchanged.
+
+---
+
+# Previous release — v1.0.0
 
 **Release date:** 2026
 

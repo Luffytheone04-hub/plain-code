@@ -1135,9 +1135,9 @@ test('plain help includes "plain update"', () => {
   if (!out.includes('plain update')) throw new Error(`"plain update" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.1.1-beta', () => {
+test('plain version shows 2.0.0-beta', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.1')) throw new Error(`Expected version 1.1.1-beta but got: ${out}`);
+  if (!out.includes('2.0.0-beta')) throw new Error(`Expected version 2.0.0-beta but got: ${out}`);
 });
 
 // ── v0.5 — Formatter ─────────────────────────────────────────────────────────
@@ -1403,9 +1403,20 @@ test('plain help includes "plain fmt"', () => {
   if (!out.includes('plain fmt')) throw new Error(`"plain fmt" missing from help. Got:\n${out}`);
 });
 
-test('plain version shows 1.1.1-beta', () => {
+test('plain version shows 2.0.0-beta', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.1')) throw new Error(`Expected version 1.1.1-beta but got: ${out}`);
+  if (!out.includes('2.0.0-beta')) throw new Error(`Expected version 2.0.0-beta but got: ${out}`);
+});
+
+test('package.json exposes a global plain bin with a node shebang', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  if (!pkg.bin || pkg.bin.plain !== './compiler/cli.js') throw new Error('missing "plain" bin');
+  if (!pkg.bin['plain-code']) throw new Error('missing "plain-code" bin');
+  if (pkg.preferGlobal !== true) throw new Error('preferGlobal should be true');
+  const firstLine = fs.readFileSync(path.join(__dirname, '..', 'compiler', 'cli.js'), 'utf8').split('\n')[0];
+  if (firstLine.trim() !== '#!/usr/bin/env node') {
+    throw new Error('compiler/cli.js must start with a node shebang for global installs');
+  }
 });
 
 // ── v0.6 — Extended comparisons ──────────────────────────────────────────────
@@ -1770,9 +1781,9 @@ test('"execute" block compiles to db.exec()', () => {
 
 console.log('\nv0.6 — CLI updates');
 
-test('plain version shows 1.1.1-beta (CLI)', () => {
+test('plain version shows 2.0.0-beta (CLI)', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.1')) throw new Error(`Expected 1.1.1-beta but got: ${out}`);
+  if (!out.includes('2.0.0-beta')) throw new Error(`Expected 2.0.0-beta but got: ${out}`);
 });
 
 test('plain help mentions v1.0 features', () => {
@@ -2022,11 +2033,14 @@ test('unknown command shows an error message', () => {
   }
 });
 
-test('plain run on nonexistent file exits with an error', () => {
+test('plain run on a nonexistent file exits with a friendly error', () => {
   const dir = tmpDir();
   const out = runCli(['run', 'no_such_file.pln'], dir);
-  if (!out.toLowerCase().includes('cannot find') && !out.toLowerCase().includes('not found') && !out.toLowerCase().includes('resolving')) {
-    throw new Error(`Expected file-not-found error but got: ${out}`);
+  if (!out.includes('File not found')) {
+    throw new Error(`Expected "File not found" error but got: ${out}`);
+  }
+  if (out.includes('AI-assisted')) {
+    throw new Error(`AI must not be invoked for a missing file. Output:\n${out}`);
   }
 });
 
@@ -2745,7 +2759,7 @@ test('plain help includes the JavaScript Gateway', () => {
 
 test('plain version shows the beta version', () => {
   const out = runCli(['version'], process.cwd());
-  if (!out.includes('1.1.1')) throw new Error(`Expected 1.1.1-beta but got: ${out}`);
+  if (!out.includes('2.0.0-beta')) throw new Error(`Expected 2.0.0-beta but got: ${out}`);
 });
 
 test('plain build produces executable async output for a JavaScript block', () => {
@@ -2758,12 +2772,14 @@ test('plain build produces executable async output for a JavaScript block', () =
   if (!js.includes('let x = await (async () => {')) throw new Error('JS block missing in build');
 });
 
-test('plain run on a nonexistent file reports a friendly error', () => {
+test('plain run on a nonexistent file reports a friendly error and does not invoke AI', () => {
   const dir = tmpDir();
   const out = runCli(['run', 'missing.pln'], dir);
-  const msg = out.toLowerCase();
-  if (!msg.includes('cannot find') && !msg.includes('not found') && !msg.includes('resolving')) {
-    throw new Error(`Expected a file-not-found error but got: ${out}`);
+  if (!out.includes('File not found')) {
+    throw new Error(`Expected a "File not found" error but got: ${out}`);
+  }
+  if (out.includes('AI-assisted')) {
+    throw new Error(`AI must not be invoked for a missing file. Output:\n${out}`);
   }
 });
 

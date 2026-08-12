@@ -8,21 +8,21 @@
     ignoreCase: false
 
     styles: [
-        "keyword", #CC7832, #CC7832, @B
-        "keyword2", #AE8ABE, #AE8ABE, @B
-        "builtin", #56B6C2, #56B6C2
-        "function", #61AFEF, #61AFEF
-        "variable", #E5C07B, #E5C07B
-        "property", #98C379, #98C379
-        "string", #6A8759, #6A8759
-        "number", #6897BB, #6897BB
-        "package", #C678DD, #C678DD
-        "operator", #508090, #508090
-        "comment", #808080, #808080, @I
-        "javascript", #ABB2BF, #ABB2BF
+        "keyword", #D97706, #D97706, @B
+        "keyword2", #569CD6, #569CD6, @B
+        "builtin", #4EC9B0, #4EC9B0
+        "function", #DCDCAA, #DCDCAA
+        "variable", #D4D4D4, #D4D4D4
+        "property", #9CDCFE, #9CDCFE
+        "string", #6A9955, #6A9955
+        "number", #B5CEA8, #B5CEA8
+        "package", #4EC9B0, #4EC9B0
+        "operator", #D4D4D4, #D4D4D4
+        "comment", #6B7280, #6B7280, @I
+        "javascript", #D4D4D4, #D4D4D4
     ]
 
-    comment: {startsWith: "//"}
+    comment: {startsWith: "#"}
 
     bracketPairs: [
         "{}"

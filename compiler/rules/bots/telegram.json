@@ -1,0 +1,29 @@
+{
+  "name": "telegram",
+  "category": "bots",
+  "version": 1,
+  "title": "Telegram Bot",
+  "purpose": "Telegram bot creation, polling, commands, replies, buttons, callback queries, and messaging.",
+  "keywords": [
+    "telegram",
+    "bot",
+    "message",
+    "command",
+    "callback",
+    "reply",
+    "button"
+  ],
+  "triggers": [
+    { "type": "regex", "pattern": "telegram bot with token" },
+    { "type": "regex", "pattern": "\\bsends\\b" },
+    { "type": "regex", "pattern": "\\bclicks\\b" },
+    { "type": "regex", "pattern": "\\bsendMessage\\b" },
+    { "type": "regex", "pattern": "\\bsendPhoto\\b" },
+    { "type": "regex", "pattern": "\\beditMessage\\b" }
+  ],
+  "dependencies": ["node-telegram-bot-api"],
+  "imports": [],
+  "async": true,
+  "compilerMin": "2.0.0",
+  "resolvablePaths": ["bots/telegram", "bots/telegram.json"]
+}
